@@ -161,6 +161,7 @@ public class RetrievalEnvironment {
 			termidMap = new DefaultFrequencySortedDictionary(new Path(getIndexTermsData()),
 			    new Path(getIndexTermIdsData()), new Path(getIndexTermIdMappingData()), fs);
 		} catch (Exception e) {
+		  e.printStackTrace();
 			throw new ConfigurationException("Error initializing dictionary!");
 		}
 
