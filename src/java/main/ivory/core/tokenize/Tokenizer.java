@@ -23,6 +23,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -30,7 +33,10 @@ import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.mortbay.log.Log;
 
 import edu.umd.hooka.VocabularyWritable;
 
@@ -62,6 +68,26 @@ public abstract class Tokenizer {
   
   public VocabularyWritable getVocab(){
     return vocab;
+  }
+  
+  protected Set<String> readInput(FileSystem fs, String file) {
+    Set<String> lines = new HashSet<String>();
+    try {
+      Log.warn("File " + file + " exists? " + fs.exists(new Path(file)) + ", fs: "+fs);
+      FSDataInputStream fis = fs.open(new Path(file));
+      InputStreamReader isr = new InputStreamReader(fis, "UTF8");
+      BufferedReader in = new BufferedReader(isr);
+      String line;
+
+      while ((line = in.readLine()) != null) {
+        lines.add(line);
+      }
+      in.close();
+      return lines;
+    } catch (Exception e) {
+      Log.warn("Problem reading stopwords from " + file);
+      return lines;
+    }
   }
   
   /**
@@ -124,7 +150,8 @@ public abstract class Tokenizer {
    *    normalized text, ready to be run through tokenizer   
    */
   public String preNormalize(String text) {
-    return text.replaceAll("’", "\'").replaceAll("`", "\'").replaceAll("“", "\"").replaceAll("”", "\"").replaceAll("‘", "'").replaceAll("\u2019", "'");
+//    return text.replaceAll("’", "'").replaceAll("`", "'").replaceAll("“", "\"").replaceAll("”", "\"").replaceAll("‘", "'").replaceAll("\u2019", "'");
+    return text.replaceAll("\u2018", "'").replaceAll("\u2060", "'").replaceAll("\u201C", "\"").replaceAll("\u201D", "\"").replaceAll("\u00B4", "'").replaceAll("\u2019", "'").replaceAll("\u0060", "'");
   }
 
   /**
@@ -216,16 +243,21 @@ public abstract class Tokenizer {
     options.addOption(OptionBuilder.withArgName("full path to input file").hasArg().withDescription("input file").create("input"));
     options.addOption(OptionBuilder.withArgName("full path to output file").hasArg().withDescription("output file").create("output"));
     options.addOption(OptionBuilder.withArgName("en | zh | de | fr | ar | tr | es").hasArg().withDescription("2-character language code").create("lang"));
-    options.addOption(OptionBuilder.withArgName("true|false").hasArg().withDescription("turn on/off stopword removal").create("stopword"));
+    options.addOption(OptionBuilder.withArgName("path to stopwords list").hasArg().withDescription("one stopword per line").create("stopword"));
+    options.addOption(OptionBuilder.withArgName("path to stemmed stopwords list").hasArg().withDescription("one stemmed stopword per line").create("stemmed_stopword"));
     options.addOption(OptionBuilder.withArgName("true|false").hasArg().withDescription("turn on/off stemming").create("stem"));
 
     CommandLine cmdline;
     CommandLineParser parser = new GnuParser();
     try {
-      boolean isStopword = true, isStem = true;
+      String stopwordList = null, stemmedStopwordList = null;
+      boolean isStem = true;
       cmdline = parser.parse(options, args);
       if(cmdline.hasOption("stopword")){
-        isStopword = Boolean.parseBoolean(cmdline.getOptionValue("stopword"));
+        stopwordList = cmdline.getOptionValue("stopword");
+      }
+      if(cmdline.hasOption("stemmed_stopword")){
+        stemmedStopwordList = cmdline.getOptionValue("stemmed_stopword");
       }
       if(cmdline.hasOption("stem")){
         isStem = Boolean.parseBoolean(cmdline.getOptionValue("stem"));
@@ -234,7 +266,7 @@ public abstract class Tokenizer {
           cmdline.getOptionValue("lang"), 
           cmdline.getOptionValue("model"), 
           isStem, 
-          isStopword,
+          stopwordList, stemmedStopwordList,
           null);
       BufferedWriter out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(cmdline.getOptionValue("output")), "UTF8"));
       BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(cmdline.getOptionValue("input")), "UTF8"));
