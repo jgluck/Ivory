@@ -56,8 +56,8 @@ import edu.umd.hooka.alignment.HadoopAlign;
  * @author ferhanture
  *
  */
-public class PreprocessWikipedia extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(PreprocessWikipedia.class);
+public class PreprocessWikipediaKmeans extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(PreprocessWikipediaKmeans.class);
 
   /*
    * DEFINED PARAMETERS HERE:
@@ -432,6 +432,6 @@ public class PreprocessWikipedia extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    ToolRunner.run(new PreprocessWikipedia(), args);
+    ToolRunner.run(new PreprocessWikipediaKmeans(), args);
   }
 }
