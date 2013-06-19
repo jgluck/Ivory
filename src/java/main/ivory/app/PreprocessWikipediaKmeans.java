@@ -26,6 +26,7 @@ import ivory.core.preprocess.BuildTranslatedTermDocVectors;
 import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.ComputeGlobalTermStatistics;
+import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
 import java.io.IOException;
 import java.util.Arrays;
@@ -285,6 +286,14 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       LOG.info("Error: BuildTranslated/WeightedTermDocVectors. Terminating...");
       return -1;
     }
+    
+    //get initial centroids
+    startTime = System.currentTimeMillis();
+    KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
+    int numInitialCentroids = getSomeCentroidsTool.run();
+    LOG.info("Job getInitialCentroids finished in " +
+        (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+    
 
     // normalize (optional) and convert weighted term doc vectors into int doc vectors for efficiency
     startTime = System.currentTimeMillis();

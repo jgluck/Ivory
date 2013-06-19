@@ -511,6 +511,18 @@ public class RetrievalEnvironment {
 	public String getWeightedIntDocVectorsDirectory() {
 		return appendPath(indexPath, "wt-int-doc-vectors/");
 	}
+	
+	public String getKmeansVectorDirectory(){
+	  return appendPath(indexPath,"kmeans_clustering/");
+	}
+	
+	public String getKmeansCentroidDirectory(){
+	  return appendPath(indexPath,"kmeans_centroids");
+	}
+	
+	public String getInitialDocnoDirectory(){
+	  return appendPath(indexPath,"temp_docno/");
+	}
 
 	public String getTermDfCfDirectory() {
 		return appendPath(indexPath, "term-df-cf/");

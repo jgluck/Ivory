@@ -160,11 +160,14 @@ public class KmeansTermDocVectors extends PowerTool {
 
     RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
 
-    String outputPath = env.getWeightedIntDocVectorsDirectory();
+    String outputPath = env.getKmeansVectorDirectory();
+    String centroidPath = env.getKmeansCentroidDirectory();
     int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
     int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
     String collectionName = getConf().get("Ivory.CollectionName");
 
+    
+    
     sLogger.info("Characteristics of the collection:");
     sLogger.info(" - CollectionName: " + collectionName);
     sLogger.info("Characteristics of the job:");
@@ -173,11 +176,15 @@ public class KmeansTermDocVectors extends PowerTool {
 
     String vocabFile = getConf().get("Ivory.FinalVocab");
     DistributedCache.addCacheFile(new URI(vocabFile), conf);
-
+    DistributedCache.addCacheFile(new URI(centroidPath), conf);
+    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+    
+    
     Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
-    Path weightedVectorsPath = new Path(outputPath);
+    //we really need to choose numClusters docids and get theri vectors sideloaded in
+    Path kMeansPath = new Path(outputPath);
 
-    if (fs.exists(weightedVectorsPath)) {
+    if (fs.exists(kMeansPath)) {
       sLogger.info("Output path already exists!");
       return -1;
     }
@@ -188,7 +195,7 @@ public class KmeansTermDocVectors extends PowerTool {
     conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
     FileInputFormat.setInputPaths(conf, inputPath);
-    FileOutputFormat.setOutputPath(conf, weightedVectorsPath);
+    FileOutputFormat.setOutputPath(conf, kMeansPath);
 
     conf.setInputFormat(SequenceFileInputFormat.class);
     conf.setMapOutputKeyClass(IntWritable.class);
