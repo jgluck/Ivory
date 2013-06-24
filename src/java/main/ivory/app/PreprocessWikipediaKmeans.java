@@ -26,6 +26,7 @@ import ivory.core.preprocess.BuildTranslatedTermDocVectors;
 import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.ComputeGlobalTermStatistics;
+import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
 import java.io.IOException;
@@ -287,12 +288,6 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       return -1;
     }
     
-    //get initial centroids
-    startTime = System.currentTimeMillis();
-    KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
-    int numInitialCentroids = getSomeCentroidsTool.run();
-    LOG.info("Job getInitialCentroids finished in " +
-        (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
     
 
     // normalize (optional) and convert weighted term doc vectors into int doc vectors for efficiency
@@ -324,6 +319,25 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
         LOG.info("No document output! Terminating...");
         return -1;
       }
+      
+      LOG.info("about to start my nonsense");
+    //get initial centroids
+      startTime = System.currentTimeMillis();
+      KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
+      int numInitialCentroids = getSomeCentroidsTool.run();
+      LOG.info("Job getInitialCentroids finished in " +
+          (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+      LOG.info("Number of Initial Centroids: "+numInitialCentroids);
+      
+      //cluster on centroids
+      startTime = System.currentTimeMillis();
+      KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
+      int numNewCentroids = clusterThoseCentroidsTool.run();
+      LOG.info("Job clusteroncentroids finished in " +
+          (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+      LOG.info("Number of Initial Centroids: "+numInitialCentroids);
+     
+      
       // set Property.CollectionTermCount to the size of the target vocab. since all docs are translated into that vocab. This property is read by WriteRandomVectors via RunComputeSignatures.
       Vocab engVocabH = null;
       try {
