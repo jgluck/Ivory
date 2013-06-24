@@ -76,6 +76,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     OOV, NEG
   }
 
+
   private static class MyMapper extends MapReduceBase implements
       Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
 
@@ -86,6 +87,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     private String initialDocNoPath;
     private Path docnoPath;
     private FileSystem fs; 
+    private ArrayList<IntWritable> initialCentroidDocs;
     ArrayListWritable<IntWritable>  docnos;
 
     public void configure(JobConf conf){
@@ -100,23 +102,46 @@ public class KmeansGetInitialCentroids extends PowerTool {
       
       normalize = conf.getBoolean("Ivory.Normalize", false);
       initialDocNoPath = conf.get("InitialDocnoPath");
-      docnoPath = new Path(initialDocNoPath);
-      FSDataInputStream in;
-      try {
-        in = fs.open(docnoPath);
-      } catch (IOException e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-        throw new RuntimeException("Error opening the docnopath!");
-      }
-      docnos = new ArrayListWritable<IntWritable>();
       
-      try{
-        docnos.readFields(in);
-      }catch (Exception e){
+      initialCentroidDocs = new ArrayListWritable<IntWritable>();
+      
+      Integer numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
+      String indexPath = conf.get("Ivory.IndexPath");
+      RetrievalEnvironment env;
+      int numDocs = 0;
+      try {
+        env = new RetrievalEnvironment(indexPath, fs);
+        numDocs = env.readCollectionDocumentCount();
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
         e.printStackTrace();
-        throw new RuntimeException("Error getting initial docnos back from hdfs!");
       }
+      
+    
+      for(int i=0;i<numClusters;i++){
+        IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
+        while(initialCentroidDocs.contains(randomNumber)){
+          randomNumber.set(1 + (int)(Math.random()*numDocs));
+        }
+        initialCentroidDocs.add(randomNumber);
+      }
+//      docnoPath = new Path(initialDocNoPath);
+//      FSDataInputStream in;
+//      try {
+//        in = fs.open(docnoPath);
+//      } catch (IOException e1) {
+//        // TODO Auto-generated catch block
+//        e1.printStackTrace();
+//        throw new RuntimeException("Error opening the docnopath!");
+//      }
+//      docnos = new ArrayListWritable<IntWritable>();
+//      
+//      try{
+//        docnos.readFields(in);
+//      }catch (Exception e){
+//        e.printStackTrace();
+//        throw new RuntimeException("Error getting initial docnos back from hdfs!");
+//      }
       }
 
     
@@ -124,7 +149,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     throws IOException {	
       mDocno.set(docno.get());
-      if(docnos.contains(mDocno)){
+      if(initialCentroidDocs.contains(mDocno)){
         output.collect(mDocno, doc);
       }else{
         ;
@@ -151,6 +176,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
 
     JobConf conf = new JobConf(getConf(), KmeansGetInitialCentroids.class);
     FileSystem fs = FileSystem.get(conf);
+    
 
     String indexPath = getConf().get("Ivory.IndexPath");
 
@@ -175,16 +201,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     DistributedCache.addCacheFile(new URI(vocabFile), conf);
     Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
-    ArrayListWritable<IntWritable> initialCentroidDocs = new ArrayListWritable<IntWritable>();
 
-    int numDocs = env.readCollectionDocumentCount();
-    for(int i=0;i<numClusters;i++){
-      IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
-      while(initialCentroidDocs.contains(randomNumber)){
-        randomNumber.set(1 + (int)(Math.random()*numDocs));
-      }
-      initialCentroidDocs.add(randomNumber);
-    }
     
     conf.set("InitialDocnoPath", docnoDir);
     
@@ -195,7 +212,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     }
     FSDataOutputStream out = fs.create(docnoPath);
     
-    initialCentroidDocs.write(out);
+//    initialCentroidDocs.write(out);
     
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
