@@ -520,6 +520,7 @@ public class RetrievalEnvironment {
 	  return appendPath(indexPath,"kmeans_centroids");
 	}
 	
+	
 	public String getInitialDocnoDirectory(){
 	  return appendPath(indexPath,"temp_docno/");
 	}
