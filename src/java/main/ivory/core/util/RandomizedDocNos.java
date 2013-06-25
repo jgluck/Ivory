@@ -51,7 +51,7 @@ public class RandomizedDocNos {
     indexPath = conf.get("Ivory.IndexPath");
     
     try {
-      fs = FileSystem.get(conf);
+      fs = FileSystem.getLocal(conf);
       env = new RetrievalEnvironment(indexPath, fs);
       numDocs = env.readCollectionDocumentCount();
     } catch (IOException e) {
