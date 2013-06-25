@@ -65,7 +65,7 @@ import edu.umd.hooka.alignment.HadoopAlign;
  *
  */
 public class KmeansGetInitialCentroids extends PowerTool {
-  private static final Logger sLogger = Logger.getLogger(BuildWeightedIntDocVectors.class);
+  private static final Logger sLogger = Logger.getLogger(KmeansGetInitialCentroids.class);
 
   static{
     sLogger.setLevel(Level.INFO);
@@ -154,6 +154,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     throws IOException {	
       mDocno.set(docno.get());
+      sLogger.info("On mDocno:" + mDocno.get());
       if(initialCentroidDocs.contains(mDocno)){
         sLogger.info("mDocno:" + mDocno.get() + " was contained");
         output.collect(mDocno, doc);
