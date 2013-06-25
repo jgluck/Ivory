@@ -32,6 +32,7 @@ import ivory.core.tokenize.TokenizerFactory;
 import ivory.core.util.RandomizedDocNos;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -44,10 +45,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
+import org.mortbay.log.Log;
+
 import edu.umd.cloud9.collection.wikipedia.BuildWikipediaDocnoMapping;
 import edu.umd.cloud9.collection.wikipedia.RepackWikipedia;
 import edu.umd.cloud9.collection.wikipedia.WikipediaDocnoMapping;
@@ -326,6 +330,9 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       
       RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
       docnoRandomizer.getRandomDocs();
+      ArrayList<IntWritable> testArray = new ArrayList<IntWritable>();
+      docnoRandomizer.readRandomDocs(testArray);
+      LOG.info(testArray);
       
     //get initial centroids
       startTime = System.currentTimeMillis();
