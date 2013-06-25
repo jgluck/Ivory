@@ -240,7 +240,8 @@ public class KmeansGetInitialCentroids extends PowerTool {
 
     String vocabFile = getConf().get("Ivory.FinalVocab");
     DistributedCache.addCacheFile(new URI(vocabFile), conf);
-    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
+//    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
 
     
@@ -267,7 +268,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     
 //    initialCentroidDocs = new ArrayListWritable<IntWritable>();
     
-    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
+    
     
     
     conf.setJobName(KmeansGetInitialCentroids.class.getSimpleName() + ":" + collectionName);

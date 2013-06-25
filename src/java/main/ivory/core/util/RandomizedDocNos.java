@@ -111,8 +111,9 @@ public class RandomizedDocNos {
     FSDataOutputStream out = fs.create(outFile);
     for(IntWritable docno: initialCentroidDocs){
       docno.write(out);
-      out.write(0x00);
+//      out.write(0x00);
     }
+    out.close();
   }
   
   public int readRandomDocs(ArrayList<IntWritable> toFill) throws IOException{
@@ -136,8 +137,10 @@ public class RandomizedDocNos {
       IntWritable inreader = new IntWritable();
       inreader.readFields(in);
       toFill.add(inreader);
-      in.readByte();
+//      in.readByte();
     }
+    
+    in.close();
     
   
   return 0;
