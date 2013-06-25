@@ -75,6 +75,7 @@ public class RandomizedDocNos {
       numDocs = env.readCollectionDocumentCount();
     } catch (IOException e) {
       // TODO Auto-generated catch block
+      sLogger.info("Failed in settin gup fs");
       e.printStackTrace();
     }
     
