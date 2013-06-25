@@ -70,9 +70,9 @@ public class RandomizedDocNos {
     indexPath = conf.get("Ivory.IndexPath");
     
     try {
-      fs = FileSystem.get(conf);
-      env = new RetrievalEnvironment(indexPath, fs);
-      numDocs = env.readCollectionDocumentCount();
+      fs = FileSystem.getLocal(conf2);
+//      env = new RetrievalEnvironment(indexPath, fs);
+//      numDocs = env.readCollectionDocumentCount();
     } catch (IOException e) {
       // TODO Auto-generated catch block
       sLogger.info("Failed in settin gup fs");
