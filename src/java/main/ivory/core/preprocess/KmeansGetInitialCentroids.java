@@ -125,6 +125,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
       }
       
       docnorand = new RandomizedDocNos(conf,localDir);
+      initialCentroidDocs = new ArrayList<IntWritable>();
       try {
         docnorand.readRandomDocs(initialCentroidDocs);
       } catch (IOException e) {
