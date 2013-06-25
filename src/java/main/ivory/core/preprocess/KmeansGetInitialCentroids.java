@@ -40,6 +40,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
@@ -76,6 +77,10 @@ public class KmeansGetInitialCentroids extends PowerTool {
     OOV, NEG
   }
 
+//  private static class MyReducer extends MapReduceBase implements
+//    Reducer<IntWritable,WeightedIntDocVector>{
+//    
+//  }
 
   private static class MyMapper extends MapReduceBase implements
       Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
@@ -150,6 +155,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     throws IOException {	
       mDocno.set(docno.get());
       if(initialCentroidDocs.contains(mDocno)){
+        sLogger.info("mDocno:" + mDocno.get() + " was contained");
         output.collect(mDocno, doc);
       }else{
         ;
@@ -250,8 +256,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
         + " seconds");
     Counters counters = rj.getCounters();
 
-    long numOfDocs= (long) counters.findCounter(Docs.Total).getCounter();
 
-    return (int) numOfDocs;
+    return (int) getConf().getInt("Ivory.KmeansClusterCount", 5);
   }
 }
