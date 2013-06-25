@@ -102,6 +102,15 @@ public class KmeansClusterOnCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
+      try {
+        if (conf.get ("mapred.job.tracker").equals ("local")) {
+          // Explicitly not support local mode.
+          throw new RuntimeException("Local mode not supported!");
+          }
+        }catch(RuntimeException e){
+          e.printStackTrace();
+        }
+      
       normalize = conf.getBoolean("Ivory.Normalize", false);
       initialDocNoPath = conf.get("InitialDocnoPath");
       docnoPath = new Path(initialDocNoPath);
