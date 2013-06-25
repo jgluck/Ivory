@@ -29,6 +29,8 @@ import ivory.core.preprocess.ComputeGlobalTermStatistics;
 import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
+import ivory.core.util.RandomizedDocNos;
+
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
@@ -321,6 +323,10 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       }
       
       LOG.info("about to start my nonsense");
+      
+      RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
+      docnoRandomizer.getRandomDocs();
+      
     //get initial centroids
       startTime = System.currentTimeMillis();
       KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
