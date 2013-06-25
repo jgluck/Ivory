@@ -225,7 +225,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
 
     String outputPath = env.getKmeansCentroidDirectory();
-    String docnoDir = env.getInitialDocnoDirectory(); //I think I need to change this to the weighted int docvecs
+//    String docnoDir = env.getInitialDocnoDirectory(); //I think I need to change this to the weighted int docvecs
     int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
     int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
     String collectionName = getConf().get("Ivory.CollectionName");
@@ -242,19 +242,19 @@ public class KmeansGetInitialCentroids extends PowerTool {
     String vocabFile = getConf().get("Ivory.FinalVocab");
 //    DistributedCache.addCacheFile(new URI(vocabFile), conf);
 //    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
-    DistributedCache.addCacheFile(new File(env.getKmeansRandomDocNoPath()).toURI(), conf);
+    DistributedCache.addCacheFile(new Path(env.getKmeansRandomDocNoPath()).toUri(), conf);
 //    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
 
-    
-    conf.set("InitialDocnoPath", docnoDir);
-    
-    Path docnoPath = new Path(docnoDir);
-    if(fs.exists(docnoPath)){
-      sLogger.info("DocnoDir already exists!");
-      return -1;
-    }
-    FSDataOutputStream out = fs.create(docnoPath);
+//    
+//    conf.set("InitialDocnoPath", docnoDir);
+//    
+//    Path docnoPath = new Path(docnoDir);
+//    if(fs.exists(docnoPath)){
+//      sLogger.info("DocnoDir already exists!");
+//      return -1;
+//    }
+//    FSDataOutputStream out = fs.create(docnoPath);
     
 //    initialCentroidDocs.write(out);
     
