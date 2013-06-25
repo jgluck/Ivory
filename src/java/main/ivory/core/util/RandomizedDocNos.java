@@ -25,6 +25,7 @@ public class RandomizedDocNos {
   FileSystem fs; 
   private ArrayList<IntWritable> initialCentroidDocs;
   Configuration conf;
+  Path optional = null;
   
   public RandomizedDocNos(Configuration conf2){   
     conf = conf2;
@@ -46,6 +47,25 @@ public class RandomizedDocNos {
   
   public RandomizedDocNos(JobConf conf2){   
     conf = conf2;
+    numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
+    indexPath = conf.get("Ivory.IndexPath");
+    
+    try {
+      fs = FileSystem.get(conf);
+      env = new RetrievalEnvironment(indexPath, fs);
+      numDocs = env.readCollectionDocumentCount();
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    
+    initialCentroidDocs = new ArrayListWritable<IntWritable>();
+    
+  }
+  
+  public RandomizedDocNos(JobConf conf2,Path local){   
+    conf = conf2;
+    optional = local;
     numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
     indexPath = conf.get("Ivory.IndexPath");
     
@@ -96,7 +116,13 @@ public class RandomizedDocNos {
   }
   
   public int readRandomDocs(ArrayList<IntWritable> toFill) throws IOException{
-    Path inFile = new Path(env.getKmeansRandomDocNoPath());
+    Path inFile;
+    if(optional == null){
+       inFile = new Path(env.getKmeansRandomDocNoPath());
+    }else{
+       inFile = optional;
+    }
+    
    
     
     if (!fs.exists(inFile)){
@@ -109,7 +135,7 @@ public class RandomizedDocNos {
       IntWritable inreader = new IntWritable();
       inreader.readFields(in);
       toFill.add(inreader);
-      in.read();
+      in.readByte();
     }
     
   

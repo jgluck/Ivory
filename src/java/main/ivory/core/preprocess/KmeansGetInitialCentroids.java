@@ -96,8 +96,22 @@ public class KmeansGetInitialCentroids extends PowerTool {
     private ArrayList<IntWritable> initialCentroidDocs;
     ArrayListWritable<IntWritable>  docnos;
     RandomizedDocNos docnorand;
+    Path[] localFiles;
+    Path localDir;
 
     public void configure(JobConf conf){
+     try {
+      localFiles = DistributedCache.getLocalCacheFiles(conf);
+    } catch (IOException e2) {
+      // TODO Auto-generated catch block
+      sLogger.info("Failed to get local cache files");
+      e2.printStackTrace();
+    }
+     for (Path p : localFiles) {
+     if(p.toString().contains("kmeans_randomdocs")){
+            localDir = p;
+         }
+     }
      
       try {
         fs = FileSystem.get(conf);
@@ -107,7 +121,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
-      docnorand = new RandomizedDocNos(conf);
+      docnorand = new RandomizedDocNos(conf,localDir);
       try {
         docnorand.readRandomDocs(initialCentroidDocs);
       } catch (IOException e) {
