@@ -243,6 +243,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
 //    DistributedCache.addCacheFile(new URI(vocabFile), conf);
 //    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
     DistributedCache.addCacheFile(new Path(env.getKmeansRandomDocNoPath()).toUri(), conf);
+    sLogger.info("Outside of everything: "+fs.getFileStatus(new Path(env.getKmeansRandomDocNoPath())));
 //    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
 
