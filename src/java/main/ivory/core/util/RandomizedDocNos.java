@@ -124,6 +124,7 @@ public class RandomizedDocNos {
     }
     
    
+    sLogger.info("DocnoDir: " + inFile);
     
     if (!fs.exists(inFile)){
       sLogger.info("DocnoDir doesn't exists!");
