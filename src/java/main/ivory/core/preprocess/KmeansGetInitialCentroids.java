@@ -21,6 +21,7 @@ import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.RandomizedDocNos;
 import ivory.lsh.driver.PwsimEnvironment;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -240,7 +241,8 @@ public class KmeansGetInitialCentroids extends PowerTool {
 
     String vocabFile = getConf().get("Ivory.FinalVocab");
 //    DistributedCache.addCacheFile(new URI(vocabFile), conf);
-    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
+//    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
+    DistributedCache.addCacheFile(new File(env.getKmeansRandomDocNoPath()).toURI(), conf);
 //    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
 
