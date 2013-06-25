@@ -114,8 +114,15 @@ public class KmeansGetInitialCentroids extends PowerTool {
      if(p.toString().contains("kmeans_randomdocs")){
             sLogger.info("It contained it!!!!");
             localDir = p;
+            try {
+              sLogger.info("Outside of everything: "+fs.getFileStatus(p));
+            } catch (IOException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
          }
      }
+     
      
       try {
         fs = FileSystem.get(conf);
