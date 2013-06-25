@@ -155,11 +155,11 @@ public class KmeansGetInitialCentroids extends PowerTool {
     throws IOException {	
       mDocno.set(docno.get());
       sLogger.info("Lenght of thing is: "+initialCentroidDocs.size());
-      for(IntWritable x: initialCentroidDocs){
-        sLogger.info("Contents: " + x.get());
-      }
+//      for(IntWritable x: initialCentroidDocs){
+//        sLogger.info("Contents: " + x.get());
+//      }
       sLogger.info("Contents: " + initialCentroidDocs);
-      //sLogger.info("On mDocno:" + mDocno.get());
+      sLogger.info("On mDocno:" + mDocno.get());
       if(initialCentroidDocs.contains(mDocno)){
         sLogger.info("mDocno:" + mDocno.get() + " was contained");
         output.collect(mDocno, doc);
