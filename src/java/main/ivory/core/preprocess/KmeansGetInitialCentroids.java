@@ -107,8 +107,11 @@ public class KmeansGetInitialCentroids extends PowerTool {
       sLogger.info("Failed to get local cache files");
       e2.printStackTrace();
     }
+     
+     sLogger.info("Local Files: :"+  localFiles);
      for (Path p : localFiles) {
      if(p.toString().contains("kmeans_randomdocs")){
+            sLogger.info("It contained it!!!!");
             localDir = p;
          }
      }
