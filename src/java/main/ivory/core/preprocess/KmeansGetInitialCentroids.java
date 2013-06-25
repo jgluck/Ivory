@@ -18,6 +18,7 @@ package ivory.core.preprocess;
 
 import ivory.core.RetrievalEnvironment;
 import ivory.core.data.document.WeightedIntDocVector;
+import ivory.core.util.RandomizedDocNos;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.IOException;
@@ -94,6 +95,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     private FileSystem fs; 
     private ArrayList<IntWritable> initialCentroidDocs;
     ArrayListWritable<IntWritable>  docnos;
+    RandomizedDocNos docnorand;
 
     public void configure(JobConf conf){
      
@@ -105,31 +107,40 @@ public class KmeansGetInitialCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
-      normalize = conf.getBoolean("Ivory.Normalize", false);
-      initialDocNoPath = conf.get("InitialDocnoPath");
-      
-      initialCentroidDocs = new ArrayListWritable<IntWritable>();
-      
-      Integer numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
-      String indexPath = conf.get("Ivory.IndexPath");
-      RetrievalEnvironment env;
-      int numDocs = 0;
+      docnorand = new RandomizedDocNos(conf);
       try {
-        env = new RetrievalEnvironment(indexPath, fs);
-        numDocs = env.readCollectionDocumentCount();
+        docnorand.readRandomDocs(initialCentroidDocs);
       } catch (IOException e) {
-        // TODO Auto-generated catch block
+        sLogger.info("Failed to read in initial centroids in configure");
         e.printStackTrace();
       }
       
+      normalize = conf.getBoolean("Ivory.Normalize", false);
+      initialDocNoPath = conf.get("InitialDocnoPath");
+      
+
+      
+      
+//      Integer numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
+//      String indexPath = conf.get("Ivory.IndexPath");
+//      RetrievalEnvironment env;
+//      int numDocs = 0;
+//      try {
+//        env = new RetrievalEnvironment(indexPath, fs);
+//        numDocs = env.readCollectionDocumentCount();
+//      } catch (IOException e) {
+//        // TODO Auto-generated catch block
+//        e.printStackTrace();
+//      }
+      
     
-      for(int i=0;i<numClusters;i++){
-        IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
-        while(initialCentroidDocs.contains(randomNumber)){
-          randomNumber.set(1 + (int)(Math.random()*numDocs));
-        }
-        initialCentroidDocs.add(randomNumber);
-      }
+//      for(int i=0;i<numClusters;i++){
+//        IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
+//        while(initialCentroidDocs.contains(randomNumber)){
+//          randomNumber.set(1 + (int)(Math.random()*numDocs));
+//        }
+//        initialCentroidDocs.add(randomNumber);
+//      }
 //      docnoPath = new Path(initialDocNoPath);
 //      FSDataInputStream in;
 //      try {
@@ -235,6 +246,10 @@ public class KmeansGetInitialCentroids extends PowerTool {
       sLogger.info("Output path already exists!");
       return -1;
     }
+    
+//    initialCentroidDocs = new ArrayListWritable<IntWritable>();
+    
+    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
     
     
     conf.setJobName(KmeansGetInitialCentroids.class.getSimpleName() + ":" + collectionName);
