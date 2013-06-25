@@ -229,7 +229,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
     String collectionName = getConf().get("Ivory.CollectionName");
 
-    
+     
     
     
     sLogger.info("Characteristics of the collection:");
@@ -239,7 +239,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
     String vocabFile = getConf().get("Ivory.FinalVocab");
-    DistributedCache.addCacheFile(new URI(vocabFile), conf);
+//    DistributedCache.addCacheFile(new URI(vocabFile), conf);
     DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
 //    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    

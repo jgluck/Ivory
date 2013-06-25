@@ -130,6 +130,9 @@ public class RandomizedDocNos {
     
     if (!fs.exists(inFile)){
       sLogger.info("DocnoDir doesn't exists!");
+      // find the last / in inFile's name and shorten to that then get the directory data
+      sLogger.info("DirectoryListing: " + fs.listFiles(inFile.getParent(), false));
+      sLogger.info("File Status: " + fs.getFileStatus(inFile));
       return -1;
     }
     FSDataInputStream in = fs.open(inFile);
