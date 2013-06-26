@@ -344,7 +344,8 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       LOG.info("Number of Initial Centroids: "+numInitialCentroids);
       
       LOG.info("About to try reading out some centroids");
-      docnoRandomizer.getSequenceFiles("pwsim.enwiki.index/kmeans_centroids", 2);
+      //docnoRandomizer.getSequenceFiles("pwsim.enwiki.index/kmeans_centroids", 2);
+      docnoRandomizer.collectCentroids();
       LOG.info("Done with that now");
       //cluster on centroids
       startTime = System.currentTimeMillis();

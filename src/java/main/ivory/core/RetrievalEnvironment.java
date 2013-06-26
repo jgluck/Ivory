@@ -520,6 +520,10 @@ public class RetrievalEnvironment {
 	  return appendPath(indexPath,"kmeans_centroids");
 	}
 	
+	public String getCurrentCentroidPath(){
+	  return appendPath(indexPath,"kmeans_centroid");
+	}
+	
 	public String getKmeansRandomDocNoPath(){
 	  return appendPath(indexPath,"kmeans_randomdocs");
 	}
