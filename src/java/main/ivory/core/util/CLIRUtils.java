@@ -2,6 +2,7 @@ package ivory.core.util;
 
 import ivory.core.data.dictionary.FrequencySortedDictionary;
 import ivory.core.data.document.TermDocVector;
+import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.data.stat.DfTableArray;
 import ivory.core.tokenize.Tokenizer;
 import ivory.pwsim.score.Bm25;
@@ -138,6 +139,18 @@ public class CLIRUtils extends Configured {
     }else{
       return (float) (sum/(Math.sqrt(magA) * Math.sqrt(magB)));
     }
+  }
+  
+  /**
+   * @param vectorA
+   *    a term document vector
+   * @param vectorB
+   *    another term document vector
+   * @return
+   *    cosine score
+   */
+  public static float cosine(WeightedIntDocVector vectorA, WeightedIntDocVector vectorB) {
+    return cosine(vectorA.getWeightedTerms(),vectorB.getWeightedTerms());
   }
 
   /**
@@ -1230,7 +1243,6 @@ public class CLIRUtils extends Configured {
   }
 
   private static PairOfFloats getUppercaseRatio(String[] tokens1, String[] tokens2) {
-    //ěáčé
     // now, read tokens in first sentence and keep track of sequences of uppercased tokens in buffer
     HashSet<String> upperCaseMap1 = getUppercaseParts(tokens1);
     HashSet<String> upperCaseMap2 = getUppercaseParts(tokens2);

@@ -30,6 +30,7 @@ import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
 import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.ReadSequenceFile;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -330,9 +331,9 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       
       RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
       docnoRandomizer.getRandomDocs();
-      ArrayList<IntWritable> testArray = new ArrayList<IntWritable>();
-      docnoRandomizer.readRandomDocs(testArray);
-      LOG.info(testArray);
+//      ArrayList<IntWritable> testArray = new ArrayList<IntWritable>();
+//      docnoRandomizer.readRandomDocs(testArray);
+//      LOG.info(testArray);
       
     //get initial centroids
       startTime = System.currentTimeMillis();
@@ -342,6 +343,9 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
           (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
       LOG.info("Number of Initial Centroids: "+numInitialCentroids);
       
+      LOG.info("About to try reading out some centroids");
+      docnoRandomizer.getSequenceFiles("pwsim.enwiki.index/kmeans_centroids", 2);
+      LOG.info("Done with that now");
       //cluster on centroids
       startTime = System.currentTimeMillis();
       KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
