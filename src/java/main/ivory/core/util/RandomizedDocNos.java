@@ -239,6 +239,39 @@ public List<Path> getSequenceFileList(String p, final String filter, FileSystem 
   return matches;
 }
 
+
+public int readCurrentCentroids(ArrayList<WeightedIntDocVector> toFill) throws IOException{
+  Path inFile;
+  if(optional == null){
+     inFile = new Path(env.getCurrentCentroidPath());
+  }else{
+     inFile = optional;
+  }
+  
+ 
+  sLogger.info("currentCentroidfilepath: " + inFile);
+  
+  if (!fs.exists(inFile)){
+    sLogger.info("currentcentroidpath doesn't exists!");
+    // find the last / in inFile's name and shorten to that then get the directory data
+    return -1;
+  }
+  FSDataInputStream in = fs.open(inFile);
+  
+  for(int i=0;i<numClusters;i++){
+    WeightedIntDocVector inreader = new WeightedIntDocVector();
+    inreader.readFields(in);
+    toFill.add(inreader);
+//    in.readByte();
+  }
+  
+  in.close();
+  
+
+return 0;
+}
+
+
 public void collectCentroids(){
   List<Path> paths = null;
 //  List<WeightedIntDocVector> centroids = new ArrayList<WeightedIntDocVector>();

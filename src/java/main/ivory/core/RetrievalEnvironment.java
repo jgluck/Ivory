@@ -519,6 +519,10 @@ public class RetrievalEnvironment {
 	public String getKmeansCentroidDirectory(){
 	  return appendPath(indexPath,"kmeans_centroids");
 	}
+
+	public String getKmeansCentroidDirectory(int i){
+    return appendPath(indexPath,"kmeans_centroids" + "_" + i);
+  }
 	
 	public String getCurrentCentroidPath(){
 	  return appendPath(indexPath,"kmeans_centroid");
