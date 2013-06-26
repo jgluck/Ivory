@@ -1,9 +1,13 @@
 package ivory.core.util;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.WeightedIntDocVector;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -223,6 +227,72 @@ public class RandomizedDocNos {
     return n;
   }
 
+public List<Path> getSequenceFileList(String p, final String filter, FileSystem fs) throws FileNotFoundException, IOException{
+  FileStatus[] fss = fs.listStatus(new Path(p));
+  List<Path> matches = new LinkedList<Path>();
+  for (FileStatus status : fss) {
+      Path path = status.getPath();
+      if (path.toString().contains(filter)){
+        matches.add(path);
+      }
+  }
+  return matches;
+}
+
+public void collectCentroids(){
+  List<Path> paths = null;
+//  List<WeightedIntDocVector> centroids = new ArrayList<WeightedIntDocVector>();
+  Path outFile = new Path(env.getCurrentCentroidPath());
+  String p = env.getKmeansCentroidDirectory();
+  try {
+    if (fs.exists(outFile)){
+      sLogger.info("DocnoDir already exists!");
+      return;
+    }
+  } catch (IOException e2) {
+    // TODO Auto-generated catch block
+    e2.printStackTrace();
+  }
+  
+  FSDataOutputStream out = null;
+  try {
+    out = fs.create(outFile);
+  } catch (IOException e1) {
+    // TODO Auto-generated catch block
+    e1.printStackTrace();
+  }
+//  FileSystem fs = FileSystem.get(conf)
+  try {
+     paths = getSequenceFileList(p,"part-",fs);
+  } catch (FileNotFoundException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+   for(Path path: paths){
+     try {
+      SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
+      IntWritable key = new IntWritable();
+      WeightedIntDocVector value = new WeightedIntDocVector();
+      while (reader.next(key, value)) {
+        value.write(out);
+    }
+      reader.close();
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+   }
+   try {
+    out.close();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+}
+  
   
 
 }
