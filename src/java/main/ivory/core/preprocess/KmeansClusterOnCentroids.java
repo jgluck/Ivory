@@ -81,7 +81,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
   }
 
   private static class MyMapper extends MapReduceBase implements
-      Mapper<IntWritable, WeightedIntDocVector, IntWritable, IntWritable> {
+      Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
 
     static IntWritable mDocno = new IntWritable();
     private boolean normalize = false;
