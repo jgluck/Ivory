@@ -18,6 +18,8 @@ package ivory.core.preprocess;
 
 import ivory.core.RetrievalEnvironment;
 import ivory.core.data.document.WeightedIntDocVector;
+import ivory.core.util.CLIRUtils;
+import ivory.core.util.RandomizedDocNos;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.BufferedReader;
@@ -88,67 +90,68 @@ public class KmeansClusterOnCentroids extends PowerTool {
     private String initialDocNoPath;
     private Path docnoPath;
     private FileSystem fs; 
+    private ArrayList<WeightedIntDocVector> initialCentroids;
     ArrayListWritable<IntWritable>  docnos;
+    RandomizedDocNos docnorand;
     Path[] localFiles;
-    
+    Path localDir;
 
     public void configure(JobConf conf){
-     
       try {
-        fs = FileSystem.get(conf);
-      } catch (IOException e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-        throw new RuntimeException("Error getting the filesystem conf");
-      }
+       localFiles = DistributedCache.getLocalCacheFiles(conf);
+     } catch (IOException e2) {
+       // TODO Auto-generated catch block
+       sLogger.info("Failed to get local cache files");
+       e2.printStackTrace();
+     }
       
-      try {
-        if (conf.get ("mapred.job.tracker").equals ("local")) {
-          // Explicitly not support local mode.
-          throw new RuntimeException("Local mode not supported!");
+      sLogger.info("Local Files: :"+  localFiles);
+      for (Path p : localFiles) {
+      if(p.toString().contains("kmeans_centroid")){
+             sLogger.info("Found the Kmeans_CentroidFile");
+             localDir = p;
           }
-        }catch(RuntimeException e){
-          e.printStackTrace();
-        }
+      }
       
-      normalize = conf.getBoolean("Ivory.Normalize", false);
-      initialDocNoPath = conf.get("InitialDocnoPath");
-      docnoPath = new Path(initialDocNoPath);
-      FSDataInputStream in;
-      try {
-        localFiles = DistributedCache.getLocalCacheFiles(conf);
-      } catch (IOException e2) {
-        // TODO Auto-generated catch block
-        e2.printStackTrace();
-      }
-      try {
-        in = fs.open(docnoPath);
-      } catch (IOException e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-        throw new RuntimeException("Error opening the docnopath!");
-      }
-      docnos = new ArrayListWritable<IntWritable>();
       
-      try{
-        docnos.readFields(in);
-      }catch (Exception e){
-        e.printStackTrace();
-        throw new RuntimeException("Error getting initial docnos back from hdfs!");
-      }
+       try {
+         fs = FileSystem.get(conf);
+       } catch (IOException e1) {
+         // TODO Auto-generated catch block
+         e1.printStackTrace();
+         throw new RuntimeException("Error getting the filesystem conf");
+       }
+       
+       docnorand = new RandomizedDocNos(conf,localDir);
+       initialCentroids = new ArrayList<WeightedIntDocVector>();
+       try {
+         docnorand.readCurrentCentroids(initialCentroids);
+       } catch (IOException e) {
+         sLogger.info("Failed to read in initial centroids in configure");
+         e.printStackTrace();
+       }
+       
+       normalize = conf.getBoolean("Ivory.Normalize", false);
+       initialDocNoPath = conf.get("InitialDocnoPath");
       }
 
     
     public void map (IntWritable docno, WeightedIntDocVector doc,
-        OutputCollector<IntWritable, IntWritable> output, Reporter reporter)
+        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     throws IOException {	
-      mDocno.set(docno.get());
-      if(docnos.contains(mDocno)){
-        output.collect(mDocno, mDocno); //second mdocno should be what cluster we want
-      }else{
-        ;
+      float max = -500;
+      float similarity = 0;
+      IntWritable cluster = new IntWritable(0);
+      int it = 0;
+      for(WeightedIntDocVector centroid: initialCentroids){
+        similarity = CLIRUtils.cosine(doc, centroid);
+        if(similarity>max){
+          max = similarity;
+          cluster.set(it);
+        }
+        it= it +1;
       }
-      reporter.incrCounter(Docs.Total, 1);
+      output.collect(cluster, doc); //second mdocno should be what cluster we want
     }
   }
 
@@ -177,8 +180,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
 
     
     String centroidPath = env.getKmeansCentroidDirectory();
-    String outputPath = env.getKmeansVectorDirectory();
-    String docnoDir = env.getInitialDocnoDirectory(); //I think I need to change this to the weighted int docvecs
+    String outputPath = env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0));
     int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
     int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
     String collectionName = getConf().get("Ivory.CollectionName");
@@ -203,34 +205,13 @@ public class KmeansClusterOnCentroids extends PowerTool {
     if(1==1){
       return -1;
     }
-    String vocabFile = getConf().get("Ivory.FinalVocab");
-    DistributedCache.addCacheFile(new URI(vocabFile), conf);
     Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
-    ArrayListWritable<IntWritable> initialCentroidDocs = new ArrayListWritable<IntWritable>();
-
-    int numDocs = env.readCollectionDocumentCount();
-    for(int i=0;i<numClusters;i++){
-      IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
-      while(initialCentroidDocs.contains(randomNumber)){
-        randomNumber.set(1 + (int)(Math.random()*numDocs));
-      }
-      initialCentroidDocs.add(randomNumber);
-    }
+    DistributedCache.addCacheFile(new Path(env.getCurrentCentroidPath()).toUri(), conf);
+//    conf.set("InitialDocnoPath", docnoDir);
     
-    conf.set("InitialDocnoPath", docnoDir);
+   
     
-    
-    
-    
-    Path docnoPath = new Path(docnoDir);
-    if(fs.exists(docnoPath)){
-      sLogger.info("DocnoDir already exists!");
-      return -1;
-    }
-    FSDataOutputStream out = fs.create(docnoPath);
-    
-    initialCentroidDocs.write(out);
     
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
@@ -269,6 +250,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     Counters counters = rj.getCounters();
 
     long numOfDocs= (long) counters.findCounter(Docs.Total).getCounter();
+    conf.setInt("CurrentRun", conf.getInt("CurrentRun",0)+1);
 
     return (int) numOfDocs;
   }
