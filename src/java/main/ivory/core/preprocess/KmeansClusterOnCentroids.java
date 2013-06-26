@@ -194,17 +194,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     sLogger.info(" - NumMapTasks: " + mapTasks);
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
-    BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(new Path(centroidPath))));
-    String line;
-    line=br.readLine();
-    while (line != null){
-            System.out.println(line);
-            line=br.readLine();
 
-    }
-    if(1==1){
-      return -1;
-    }
     Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
     DistributedCache.addCacheFile(new Path(env.getCurrentCentroidPath()).toUri(), conf);
