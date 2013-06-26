@@ -185,12 +185,6 @@ public class KmeansGetInitialCentroids extends PowerTool {
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     throws IOException {	
       mDocno.set(docno.get());
-      sLogger.info("Lenght of thing is: "+initialCentroidDocs.size());
-//      for(IntWritable x: initialCentroidDocs){
-//        sLogger.info("Contents: " + x.get());
-//      }
-      sLogger.info("Contents: " + initialCentroidDocs);
-      sLogger.info("On mDocno:" + mDocno.get());
       if(initialCentroidDocs.contains(mDocno)){
         sLogger.info("mDocno:" + mDocno.get() + " was contained");
         output.collect(mDocno, doc);
@@ -240,29 +234,13 @@ public class KmeansGetInitialCentroids extends PowerTool {
     sLogger.info(" - NumMapTasks: " + mapTasks);
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
-    String vocabFile = getConf().get("Ivory.FinalVocab");
 //    DistributedCache.addCacheFile(new URI(vocabFile), conf);
 //    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
     DistributedCache.addCacheFile(new Path(env.getKmeansRandomDocNoPath()).toUri(), conf);
-    sLogger.info("Outside of everything: "+fs.getFileStatus(new Path(env.getKmeansRandomDocNoPath())));
 //    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
    
-
-//    
-//    conf.set("InitialDocnoPath", docnoDir);
-//    
-//    Path docnoPath = new Path(docnoDir);
-//    if(fs.exists(docnoPath)){
-//      sLogger.info("DocnoDir already exists!");
-//      return -1;
-//    }
-//    FSDataOutputStream out = fs.create(docnoPath);
-    
-//    initialCentroidDocs.write(out);
-    
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
-    //we really need to choose numClusters docids and get theri vectors sideloaded in
     Path kMeansPath = new Path(outputPath);
 
     if (fs.exists(kMeansPath)) {

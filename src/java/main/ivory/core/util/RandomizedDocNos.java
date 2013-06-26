@@ -8,9 +8,12 @@ import ivory.core.RetrievalEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.log4j.Logger;
 
@@ -153,6 +156,73 @@ public class RandomizedDocNos {
   return 0;
   }
   
+  public static int readSequenceFile(Path path, FileSystem fs, int max) throws IOException {
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, fs.getConf());
+
+    System.out.println("Reading " + path + "...\n");
+    try {
+      System.out.println("Key type: " + reader.getKeyClass().toString());
+      System.out.println("Value type: " + reader.getValueClass().toString() + "\n");
+    } catch (Exception e) {
+      throw new RuntimeException("Error: loading key/value class");
+    }
+
+    Writable key, value;
+    int n = 0;
+    try {
+      key = (Writable) reader.getKeyClass().newInstance();
+      value = (Writable) reader.getValueClass().newInstance();
+
+      while (reader.next(key, value)) {
+        System.out.println("Record " + n);
+        System.out.println("Key: " + key + "\nValue: " + value);
+        System.out.println("----------------------------------------");
+        n++;
+
+        if (n >= max)
+          break;
+      }
+      reader.close();
+      System.out.println(n + " records read.\n");
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    return n;
+  }
+  
+  public static void getSequenceFiles(String path, int maxnumrecords) throws IOException {
+
+    String f = path;
+
+    int max = Integer.MAX_VALUE;
+
+
+    FileSystem fs = FileSystem.get(new Configuration());
+    Path p = new Path(f);
+
+    if (fs.getFileStatus(p).isDir()) {
+      readSequenceFilesInDir(p, fs, max);
+    } else {
+      readSequenceFile(p, fs, max);
+    }
+  }
+  
+  private static int readSequenceFilesInDir(Path path, FileSystem fs, int max) {
+    int n = 0;
+    try {
+      FileStatus[] stat = fs.listStatus(path);
+      for (int i = 0; i < stat.length; ++i) {
+        n += readSequenceFile(stat[i].getPath(), fs ,max);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    System.out.println(n + " records read in total.");
+    return n;
+  }
+
   
 
 }
