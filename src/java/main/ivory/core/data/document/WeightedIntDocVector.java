@@ -86,8 +86,12 @@ public class WeightedIntDocVector implements IntDocVector {
 	}
 	
 	public void div (float denom){
+	  float oldVal = 0;
 	  for(int key: weightedTerms.keySet()){
-	    weightedTerms.put(key, weightedTerms.get(key)/denom);
+	    oldVal = weightedTerms.get(key);
+	    weightedTerms.put(key, oldVal/denom);
+	    sLogger.info("div has:"+oldVal + " new val: " + weightedTerms.get(key));
+	    
 	  }
 	}
 
