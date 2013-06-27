@@ -18,6 +18,7 @@ package ivory.app;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.preprocess.BuildDictionary;
 import ivory.core.preprocess.BuildIntDocVectors;
 import ivory.core.preprocess.BuildTargetLangWeightedIntDocVectors;
@@ -331,7 +332,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       
       RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
       docnoRandomizer.getRandomDocs();
-//      ArrayList<IntWritable> testArray = new ArrayList<IntWritable>();
+      ArrayList<WeightedIntDocVector> testArray = new ArrayList<WeightedIntDocVector>();
 //      docnoRandomizer.readRandomDocs(testArray);
 //      LOG.info(testArray);
       
@@ -346,6 +347,8 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       LOG.info("About to try reading out some centroids");
       //docnoRandomizer.getSequenceFiles("pwsim.enwiki.index/kmeans_centroids", 2);
       docnoRandomizer.collectCentroids();
+      docnoRandomizer.readCurrentCentroids(testArray);
+      LOG.info(testArray);
       LOG.info("Done with that now");
       //cluster on centroids
       startTime = System.currentTimeMillis();
@@ -355,6 +358,11 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
           (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
       LOG.info("Number of Initial Centroids: "+numInitialCentroids);
      
+      docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
+      testArray.clear();
+      docnoRandomizer.readCurrentCentroids(testArray);
+      LOG.info(testArray);
+      
       
       // set Property.CollectionTermCount to the size of the target vocab. since all docs are translated into that vocab. This property is read by WriteRandomVectors via RunComputeSignatures.
       Vocab engVocabH = null;
