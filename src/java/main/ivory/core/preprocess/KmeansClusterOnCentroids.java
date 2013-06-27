@@ -87,7 +87,6 @@ public class KmeansClusterOnCentroids extends PowerTool {
   Reducer<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
     private String initialDocNoPath;
     private FileSystem fs; 
-    RandomizedDocNos docnorand;
     Path targetDir;
     
     public void configure(JobConf conf){
@@ -98,7 +97,6 @@ public class KmeansClusterOnCentroids extends PowerTool {
         e1.printStackTrace();
         throw new RuntimeException("Error getting the filesystem conf");
       }
-      docnorand = new RandomizedDocNos(conf);
       
     }
     
@@ -114,6 +112,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
         count = count + 1;
       }
       sum.div(count);
+      sLogger.info("New vector: " + sum);
       output.collect(clusterMembership, sum);
     }
     
