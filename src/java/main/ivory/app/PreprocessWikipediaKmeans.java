@@ -348,7 +348,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       //docnoRandomizer.getSequenceFiles("pwsim.enwiki.index/kmeans_centroids", 2);
       docnoRandomizer.collectCentroids();
       docnoRandomizer.readCurrentCentroids(testArray);
-      LOG.info(testArray);
+      LOG.info("Initial Centroids: " +testArray);
       LOG.info("Done with that now");
       //cluster on centroids
       startTime = System.currentTimeMillis();
@@ -361,7 +361,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
       testArray.clear();
       docnoRandomizer.readCurrentCentroids(testArray);
-      LOG.info(testArray);
+      LOG.info("Centroids after clustering: " +testArray);
       
       
       // set Property.CollectionTermCount to the size of the target vocab. since all docs are translated into that vocab. This property is read by WriteRandomVectors via RunComputeSignatures.
