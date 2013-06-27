@@ -28,6 +28,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -44,6 +45,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
@@ -51,6 +53,7 @@ import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import edu.umd.cloud9.example.memcached.demo.WordCount.MyReducer;
 import edu.umd.cloud9.io.array.ArrayListWritable;
 import edu.umd.cloud9.io.map.HMapIFW;
 import edu.umd.cloud9.io.map.HMapSFW;
@@ -79,13 +82,49 @@ public class KmeansClusterOnCentroids extends PowerTool {
   protected static enum Terms{
     OOV, NEG
   }
-
+  
+  private static class MyReducer extends MapReduceBase implements
+  Reducer<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+    private String initialDocNoPath;
+    private FileSystem fs; 
+    RandomizedDocNos docnorand;
+    Path targetDir;
+    
+    public void configure(JobConf conf){
+      try {
+        fs = FileSystem.get(conf);
+      } catch (IOException e1) {
+        // TODO Auto-generated catch block
+        e1.printStackTrace();
+        throw new RuntimeException("Error getting the filesystem conf");
+      }
+      docnorand = new RandomizedDocNos(conf);
+      
+    }
+    
+    public void reduce(IntWritable clusterMembership, Iterator<WeightedIntDocVector> vectors,
+        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter) throws IOException {
+      // TODO Auto-generated method stub
+      WeightedIntDocVector curr;
+      WeightedIntDocVector sum = new WeightedIntDocVector();
+      float count = 0;
+      while(vectors.hasNext()){
+        curr=vectors.next();
+        sum.plus(curr);
+        count = count + 1;
+      }
+      sum.div(count);
+      output.collect(clusterMembership, sum);
+    }
+    
+    
+  }
+    
   private static class MyMapper extends MapReduceBase implements
       Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
 
     static IntWritable mDocno = new IntWritable();
     private boolean normalize = false;
-    private Vocab engVocabH;
     private ArrayListWritable<IntWritable> centroidDocNos;
     private String initialDocNoPath;
     private Path docnoPath;
@@ -216,7 +255,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     
     conf.setJobName(KmeansClusterOnCentroids.class.getSimpleName() + ":" + collectionName);
     conf.setNumMapTasks(mapTasks);
-    conf.setNumReduceTasks(0);
+    conf.setNumReduceTasks(numClusters);
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
@@ -229,8 +268,10 @@ public class KmeansClusterOnCentroids extends PowerTool {
     conf.setOutputFormat(SequenceFileOutputFormat.class);
     conf.setOutputKeyClass(IntWritable.class);
     conf.setOutputValueClass(WeightedIntDocVector.class);
+   
 
     conf.setMapperClass(MyMapper.class);
+    conf.setReducerClass(MyReducer.class);
 
     long startTime = System.currentTimeMillis();
 

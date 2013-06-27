@@ -84,6 +84,12 @@ public class WeightedIntDocVector implements IntDocVector {
 		weightedTerms.plus (otherVector.weightedTerms);
 		docLength += otherVector.docLength;
 	}
+	
+	public void div (float denom){
+	  for(int key: weightedTerms.keySet()){
+	    weightedTerms.put(key, weightedTerms.get(key)/denom);
+	  }
+	}
 
 	public void normalizeWith (float l) {
 		for (int f : weightedTerms.keySet ()) {
