@@ -516,6 +516,10 @@ public class RetrievalEnvironment {
 	  return appendPath(indexPath,"kmeans_clustering/");
 	}
 	
+	 public String getKmeansFinalDirectory(){
+	    return appendPath(indexPath,"kmeans_clusters/");
+	  }
+	
 	public String getKmeansCentroidDirectory(){
 	  return appendPath(indexPath,"kmeans_centroids");
 	}
