@@ -336,16 +336,16 @@ public void collectCentroids(String p){
   List<Path> paths = null;
 //  List<WeightedIntDocVector> centroids = new ArrayList<WeightedIntDocVector>();
   Path outFile = new Path(env.getCurrentCentroidPath());
-  try {
-    if (fs.exists(outFile)){
-      sLogger.info("DocnoDir already exists!");
-      return;
-    }
-  } catch (IOException e2) {
-    // TODO Auto-generated catch block
-    e2.printStackTrace();
-  }
-  
+//  try {
+//    if (fs.exists(outFile)){
+//      sLogger.info("DocnoDir already exists!");
+//      return;
+//    }
+//  } catch (IOException e2) {
+//    // TODO Auto-generated catch block
+//    e2.printStackTrace();
+//  }
+//  
   FSDataOutputStream out = null;
   try {
     out = fs.create(outFile);
