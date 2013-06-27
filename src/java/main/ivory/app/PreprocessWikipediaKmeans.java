@@ -354,6 +354,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       //cluster on centroids
       for(int i=0;i<5;i++){
       startTime = System.currentTimeMillis();
+      conf.setInt("CurrentRun", i);
       KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
       int numNewCentroids = clusterThoseCentroidsTool.run();
       LOG.info("Job clusteroncentroids finished in " +
