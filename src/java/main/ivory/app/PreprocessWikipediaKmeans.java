@@ -349,6 +349,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       docnoRandomizer.collectCentroids();
       docnoRandomizer.readCurrentCentroids(testArray);
       LOG.info("Initial Centroids: " +testArray);
+      LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
       LOG.info("Done with that now");
       //cluster on centroids
       startTime = System.currentTimeMillis();
@@ -362,6 +363,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       testArray.clear();
       docnoRandomizer.readCurrentCentroids(testArray);
       LOG.info("Centroids after clustering: " +testArray);
+      LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
       
       
       // set Property.CollectionTermCount to the size of the target vocab. since all docs are translated into that vocab. This property is read by WriteRandomVectors via RunComputeSignatures.
