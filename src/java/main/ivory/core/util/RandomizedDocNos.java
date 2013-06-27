@@ -327,6 +327,22 @@ public void collectCentroids(){
    
 }
 
+public int whichCluster(ArrayList<WeightedIntDocVector> initialCentroids, WeightedIntDocVector doc){
+  float max = -500;
+  float similarity = 0;
+  IntWritable cluster = new IntWritable(-1);
+  int it = 0;
+  for(WeightedIntDocVector centroid: initialCentroids){
+    similarity = CLIRUtils.cosine(doc, centroid);
+    if(similarity>max){
+      max = similarity;
+      cluster.set(it);
+    }
+    it= it +1;
+  }
+  return cluster.get();
+}
+
 public void outputCentroids(){
   String p = env.getCurrentCentroidPath();
   

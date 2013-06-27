@@ -28,6 +28,7 @@ import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.ComputeGlobalTermStatistics;
 import ivory.core.preprocess.KmeansClusterOnCentroids;
+import ivory.core.preprocess.KmeansFinalClusterStep;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
 import ivory.core.util.RandomizedDocNos;
@@ -353,20 +354,28 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       LOG.info("Done with that now");
       //cluster on centroids
       for(int i=0;i<5;i++){
+        startTime = System.currentTimeMillis();
+        conf.setInt("CurrentRun", i);
+        KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
+        int numNewCentroids = clusterThoseCentroidsTool.run();
+        LOG.info("Job clusteroncentroids finished in " +
+            (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
+        LOG.info("Number of Initial Centroids: "+numInitialCentroids);
+       
+        docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
+        testArray.clear();
+        docnoRandomizer.readCurrentCentroids(testArray);
+        LOG.info("Centroids after clustering: " +testArray);
+        LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
+      }
+      
       startTime = System.currentTimeMillis();
-      conf.setInt("CurrentRun", i);
-      KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
-      int numNewCentroids = clusterThoseCentroidsTool.run();
-      LOG.info("Job clusteroncentroids finished in " +
+      KmeansFinalClusterStep finalClusterer = new KmeansFinalClusterStep(conf);
+      int resultOfFinalClusterStep = finalClusterer.run();
+      LOG.info("Job finalClusterStep finished in " +
           (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
       LOG.info("Number of Initial Centroids: "+numInitialCentroids);
-     
-      docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
-      testArray.clear();
-      docnoRandomizer.readCurrentCentroids(testArray);
-      LOG.info("Centroids after clustering: " +testArray);
-      LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
-      }
+      
       
       // set Property.CollectionTermCount to the size of the target vocab. since all docs are translated into that vocab. This property is read by WriteRandomVectors via RunComputeSignatures.
       Vocab engVocabH = null;
