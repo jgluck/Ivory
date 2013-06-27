@@ -277,15 +277,15 @@ public void collectCentroids(){
 //  List<WeightedIntDocVector> centroids = new ArrayList<WeightedIntDocVector>();
   Path outFile = new Path(env.getCurrentCentroidPath());
   String p = env.getKmeansCentroidDirectory();
-  try {
-    if (fs.exists(outFile)){
-      sLogger.info("DocnoDir already exists!");
-      return;
-    }
-  } catch (IOException e2) {
-    // TODO Auto-generated catch block
-    e2.printStackTrace();
-  }
+//  try {
+//    if (fs.exists(outFile)){
+//      sLogger.info("Centroids file already exists!");
+//      return;
+//    }
+//  } catch (IOException e2) {
+//    // TODO Auto-generated catch block
+//    e2.printStackTrace();
+//  }
   
   FSDataOutputStream out = null;
   try {
@@ -329,6 +329,7 @@ public void collectCentroids(){
 
 public void outputCentroids(){
   String p = env.getCurrentCentroidPath();
+  
 }
 
 public void collectCentroids(String p){
