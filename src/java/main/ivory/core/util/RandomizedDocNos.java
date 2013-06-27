@@ -324,8 +324,64 @@ public void collectCentroids(){
     // TODO Auto-generated catch block
     e.printStackTrace();
   }
+   
 }
+
+public void outputCentroids(){
+  String p = env.getCurrentCentroidPath();
+}
+
+public void collectCentroids(String p){
+  List<Path> paths = null;
+//  List<WeightedIntDocVector> centroids = new ArrayList<WeightedIntDocVector>();
+  Path outFile = new Path(env.getCurrentCentroidPath());
+  try {
+    if (fs.exists(outFile)){
+      sLogger.info("DocnoDir already exists!");
+      return;
+    }
+  } catch (IOException e2) {
+    // TODO Auto-generated catch block
+    e2.printStackTrace();
+  }
   
-  
+  FSDataOutputStream out = null;
+  try {
+    out = fs.create(outFile);
+  } catch (IOException e1) {
+    // TODO Auto-generated catch block
+    e1.printStackTrace();
+  }
+//  FileSystem fs = FileSystem.get(conf)
+  try {
+     paths = getSequenceFileList(p,"part-",fs);
+  } catch (FileNotFoundException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+   for(Path path: paths){
+     try {
+      SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
+      IntWritable key = new IntWritable();
+      WeightedIntDocVector value = new WeightedIntDocVector();
+      while (reader.next(key, value)) {
+        value.write(out);
+    }
+      reader.close();
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+   }
+   try {
+    out.close();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+}
 
 }
