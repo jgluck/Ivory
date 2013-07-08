@@ -1,3 +1,48 @@
+Version 0.12.2
+=============
+July 7, 2013
+
++ Upgrade to CDH 4.3.0, Cloud9 1.4.17
++ Minor tweaks to cross-lingual pairwise-comparison code
++ Refactored Wikipedia integration tests
+
+Version 0.12.1
+==============
+June 16, 2013
+
++ Minor cleanup in CLIR code
++ Minor tweaks to bitext classification code
++ Updated documentation cross-lingual pairwise-comparison
++ Upgraded to newer version of Cloud9 artifact
+
+Version 0.12.0
+==============
+May 28, 2013
+
++ Added code for various CLIR techniques (SIGIR 2013)
+
+Version 0.11.1
+==============
+May 19, 2013
+
++ Improved documentation for feature extraction using document vectors (IRJ 2012)
+
+Version 0.11.0
+==============
+May 10, 2013
+
++ Added code for feature extraction using document vectors (IRJ 2012)
++ Minor updates to documentation
+
+Version 0.10.0
+==============
+May 3, 2013
+
++ Upgraded to Cloud9 1.4.14
++ Indirectly (via Cloud9) upgraded CDH
++ Indirectly (via Cloud9) upgraded dsiutils, sux4j, fastutil: new dictionary format that is not backwards compatible
++ Fixed CACM integration test
+
 Version 0.9.1
 =============
 January 29, 2013
