@@ -16,7 +16,9 @@
 
 package ivory.core.preprocess;
 
+import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.DocnoWeightedIntDocVectorPair;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.CLIRUtils;
 import ivory.core.util.RandomizedDocNos;
@@ -29,6 +31,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -52,6 +55,7 @@ import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.mortbay.log.Log;
 
 import edu.umd.cloud9.example.memcached.demo.WordCount.MyReducer;
 import edu.umd.cloud9.io.array.ArrayListWritable;
@@ -84,7 +88,7 @@ public class KmeansFinalClusterStep extends PowerTool {
   }
   
   private static class MyReducer extends MapReduceBase implements
-  Reducer<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+  Reducer<IntWritable, DocnoWeightedIntDocVectorPair, IntWritable, IntWritable> {
     private String initialDocNoPath;
     private FileSystem fs; 
     Path targetDir;
@@ -100,22 +104,17 @@ public class KmeansFinalClusterStep extends PowerTool {
       
     }
     
-    public void reduce(IntWritable clusterMembership, Iterator<WeightedIntDocVector> vectors,
-        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter) throws IOException {
-      // TODO Auto-generated method stub
-      WeightedIntDocVector curr;
-      WeightedIntDocVector sum = new WeightedIntDocVector();
-      float count = 0;
+    public void reduce(IntWritable clusterMembership, Iterator<DocnoWeightedIntDocVectorPair> vectors,
+        OutputCollector<IntWritable, IntWritable> output, Reporter reporter) throws IOException {
+      Log.info("Adding vectors with cluster membership: " + clusterMembership);
       while(vectors.hasNext()){
-        output.collect(clusterMembership, vectors.next());
+        output.collect(clusterMembership, vectors.next().getDocno());
       }
-      sum.div(count);
-      sLogger.info("New vector: " + sum);
     }
   }
     
   private static class MyMapper extends MapReduceBase implements
-      Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+      Mapper<IntWritable, WeightedIntDocVector, IntWritable, DocnoWeightedIntDocVectorPair> {
 
     static IntWritable mDocno = new IntWritable();
     private boolean normalize = false;
@@ -170,12 +169,13 @@ public class KmeansFinalClusterStep extends PowerTool {
 
     
     public void map (IntWritable docno, WeightedIntDocVector doc,
-        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
+        OutputCollector<IntWritable, DocnoWeightedIntDocVectorPair> output, Reporter reporter)
     throws IOException {	
       float max = -500;
       float similarity = 0;
       IntWritable cluster = new IntWritable(0);
       int it = 0;
+      DocnoWeightedIntDocVectorPair toOutput = new DocnoWeightedIntDocVectorPair(docno,doc);
       for(WeightedIntDocVector centroid: initialCentroids){
         similarity = CLIRUtils.cosine(doc, centroid);
         if(similarity>max){
@@ -184,7 +184,7 @@ public class KmeansFinalClusterStep extends PowerTool {
         }
         it= it +1;
       }
-      output.collect(cluster, doc); //second mdocno should be what cluster we want
+      output.collect(cluster, toOutput); //second mdocno should be what cluster we want
     }
   }
 
@@ -228,7 +228,7 @@ public class KmeansFinalClusterStep extends PowerTool {
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
 
-    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+    Integer numClusters = getConf().getInt(Constants.KmeansClusterCount, 5);
    
     DistributedCache.addCacheFile(new Path(env.getCurrentCentroidPath()).toUri(), conf);
 //    conf.set("InitialDocnoPath", docnoDir);
@@ -238,6 +238,7 @@ public class KmeansFinalClusterStep extends PowerTool {
     
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
+//    Path inputPath = new Path(env.getIntDocVectorsDirectory());
     //we really need to choose numClusters docids and get theri vectors sideloaded in
     Path kMeansPath = new Path(outputPath);
 
@@ -249,7 +250,7 @@ public class KmeansFinalClusterStep extends PowerTool {
     
     conf.setJobName(KmeansFinalClusterStep.class.getSimpleName() + ":" + collectionName);
     conf.setNumMapTasks(mapTasks);
-    conf.setNumReduceTasks(numClusters);
+    conf.setNumReduceTasks(100); //TODO FIX NUM REDUCERS
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
@@ -258,10 +259,10 @@ public class KmeansFinalClusterStep extends PowerTool {
 
     conf.setInputFormat(SequenceFileInputFormat.class);
     conf.setMapOutputKeyClass(IntWritable.class);
-    conf.setMapOutputValueClass(WeightedIntDocVector.class);
+    conf.setMapOutputValueClass(DocnoWeightedIntDocVectorPair.class);
     conf.setOutputFormat(SequenceFileOutputFormat.class);
     conf.setOutputKeyClass(IntWritable.class);
-    conf.setOutputValueClass(WeightedIntDocVector.class);
+    conf.setOutputValueClass(IntWritable.class);
    
 
     conf.setMapperClass(MyMapper.class);

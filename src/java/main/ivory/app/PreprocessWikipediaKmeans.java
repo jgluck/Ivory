@@ -18,6 +18,8 @@ package ivory.app;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.IntDocVector;
+import ivory.core.data.document.LazyIntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.preprocess.BuildDictionary;
 import ivory.core.preprocess.BuildIntDocVectors;
@@ -55,7 +57,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 import org.mortbay.log.Log;
 
-import edu.umd.cloud9.collection.wikipedia.BuildWikipediaDocnoMapping;
+import edu.umd.cloud9.collection.wikipedia.WikipediaDocnoMappingBuilder;
 import edu.umd.cloud9.collection.wikipedia.RepackWikipedia;
 import edu.umd.cloud9.collection.wikipedia.WikipediaDocnoMapping;
 import edu.umd.hooka.Vocab;
@@ -199,21 +201,23 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       LOG.info(mappingFile + " doesn't exist, creating...");
       String[] arr = new String[] {
           "-input=" + rawCollection,
-          "-output_path=" + indexRootPath + "/wiki-docid-tmp",
+//          "-output_path=" + indexRootPath + "/wiki-docid-tmp",
           "-output_file=" + mappingFile.toString(),
           "-wiki_language=" + collectionLang };
       LOG.info("Running BuildWikipediaDocnoMapping with args " + Arrays.toString(arr));
 
-      BuildWikipediaDocnoMapping tool = new BuildWikipediaDocnoMapping();
+      WikipediaDocnoMappingBuilder tool = new WikipediaDocnoMappingBuilder();
       tool.setConf(conf);
       tool.run(arr);
 
       fs.delete(new Path(indexRootPath + "/wiki-docid-tmp"), true);
+    } else {
+      LOG.info("Docno mapping already exists at: " + mappingFile);
     }
 
     // Repack Wikipedia into sequential compressed block
-    p = new Path(seqCollection);
-    if (!fs.exists(p)) {
+//    p = new Path(seqCollection);
+    if (!fs.exists(new Path(seqCollection + "/part-00000"))) {
       LOG.info(seqCollection + " doesn't exist, creating...");
       String[] arr = new String[] { "-input=" + rawCollection,
           "-output=" + seqCollection,
@@ -225,6 +229,8 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       RepackWikipedia tool = new RepackWikipedia();
       tool.setConf(conf);
       tool.run(arr);
+    }  else {
+      LOG.info("Repacked collection already exists at: " + seqCollection);      
     }
 
     conf.set(Constants.CollectionName, "Wikipedia-"+collectionLang);
@@ -297,8 +303,6 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       return -1;
     }
     
-    
-
     // normalize (optional) and convert weighted term doc vectors into int doc vectors for efficiency
     startTime = System.currentTimeMillis();
     LOG.info("Building weighted integer doc vectors...");
@@ -338,6 +342,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
 //      LOG.info(testArray);
       
     //get initial centroids
+      conf.set(Constants.KmeansDocumentType, WeightedIntDocVector.class.getCanonicalName());
       startTime = System.currentTimeMillis();
       KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
       int numInitialCentroids = getSomeCentroidsTool.run();
@@ -350,7 +355,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       docnoRandomizer.collectCentroids();
       docnoRandomizer.readCurrentCentroids(testArray);
       LOG.info("Initial Centroids: " +testArray);
-      LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
+//      LOG.info("Length of first object: " + testArray.get(0)..size());
       LOG.info("Done with that now");
       //cluster on centroids
       for(int i=0;i<5;i++){
@@ -363,10 +368,10 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
         LOG.info("Number of Initial Centroids: "+numInitialCentroids);
        
         docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
-        testArray.clear();
-        docnoRandomizer.readCurrentCentroids(testArray);
-        LOG.info("Centroids after clustering: " +testArray);
-        LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
+//        testArray.clear();
+//        docnoRandomizer.readCurrentCentroids(testArray);
+        //LOG.info("Centroids after clustering: " +testArray);
+        //LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
       }
       
       startTime = System.currentTimeMillis();

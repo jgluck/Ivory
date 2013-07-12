@@ -16,10 +16,23 @@
 
 package ivory.app;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import ivory.core.Constants;
+import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.LazyIntDocVector;
+import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.index.BuildIPInvertedIndexDocSorted;
 import ivory.core.index.BuildIntPostingsForwardIndex;
 import ivory.core.index.BuildLPInvertedIndexDocSorted;
+import ivory.core.index.KmeansBuildIPInvertedIndexDocSorted;
+import ivory.core.preprocess.BuildWeightedIntDocVectors;
+import ivory.core.preprocess.BuildWeightedTermDocVectors;
+import ivory.core.preprocess.KmeansClusterOnCentroids;
+import ivory.core.preprocess.KmeansFinalClusterStep;
+import ivory.core.preprocess.KmeansGetInitialCentroids;
+import ivory.core.util.RandomizedDocNos;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -31,12 +44,15 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
+import org.mortbay.log.Log;
 
-public class BuildIndex extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(BuildIndex.class);
+public class BuildIndexKmeans extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(BuildIndexKmeans.class);
 
   public static final String INDEX_PATH = "index";
   public static final String INDEX_PARTITIONS = "indexPartitions";
@@ -93,9 +109,73 @@ public class BuildIndex extends Configured implements Tool {
       conf.setInt(Constants.NumReduceTasks, indexPartitions);
       conf.set(Constants.PostingsListsType,
           ivory.core.data.index.PostingsListDocSortedPositional.class.getCanonicalName());
-
-      new BuildIPInvertedIndexDocSorted(conf).run();
-      new BuildIntPostingsForwardIndex(conf).run();
+      //gonna do my stuff here
+      
+      conf.set("Ivory.ScoringModel", "ivory.pwsim.score.Bm25");
+      conf.setBoolean("Ivory.Normalize", true);
+      conf.setInt("Ivory.MinNumTerms",5);
+      conf.setInt(Constants.KmeansClusterCount, 1000);
+      conf.setInt(Constants.NumMapTasks, 100);
+      conf.setInt(Constants.KmeansPackCount, 100);
+      int exitCode = new BuildWeightedIntDocVectors(conf).run();
+//      int exitCode = new BuildWeightedTermDocVectors(conf).run();
+      
+      conf.set(Constants.KmeansDocumentType, WeightedIntDocVector.class.getCanonicalName());
+      
+//      conf.setInt(Constants.KmeansClusterCount, 1000);
+      ArrayList<WeightedIntDocVector> testArray = new ArrayList<WeightedIntDocVector>();
+      
+      //get some initial centroid numbers
+      
+      RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
+      docnoRandomizer.getRandomDocs();
+      
+      //uncomment from here
+      
+//      KmeansGetInitialCentroids getSomeCentroidsTool = new KmeansGetInitialCentroids(conf);
+//      int numInitialCentroids = getSomeCentroidsTool.run();
+//      LOG.info("Ran my initial Centroids Job returned: " + numInitialCentroids);
+//      
+//      docnoRandomizer.collectCentroids();
+//      
+//      FileSystem fs = FileSystem.get(conf);
+//      RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
+//      
+//      //kmeans loop
+//      for(int i=0;i<5;i++){
+//       
+//        conf.setInt("CurrentRun", i);
+//        KmeansClusterOnCentroids clusterThoseCentroidsTool = new KmeansClusterOnCentroids(conf);
+//        int numNewCentroids = clusterThoseCentroidsTool.run();
+//        LOG.info("Number of Initial Centroids: "+numInitialCentroids);
+//       
+//        docnoRandomizer.collectCentroids(env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0)));
+////        testArray.clear();
+////         docnoRandomizer.readCurrentCentroids(testArray);
+////         LOG.info("Centroids after clustering: " +testArray);
+////         LOG.info("Length of first object: " + testArray.get(0).getWeightedTerms().size());
+//      }
+//      KmeansFinalClusterStep finalClusterer = new KmeansFinalClusterStep(conf);
+//      int resultOfFinalClusterStep = finalClusterer.run();
+      
+      //comment up to here
+      
+     
+      
+      
+      HashMap<Integer,Integer> clusterPackMap = new HashMap<Integer,Integer>();
+      HashMap<Integer,Integer> docnoToClusterMap = new HashMap<Integer,Integer>();  
+      docnoRandomizer.bringPackMapping(docnoToClusterMap, clusterPackMap);
+//      docnoRandomizer.OutputDocNosTest(docnoToClusterMap);
+      docnoRandomizer.packLazyVectors(docnoToClusterMap, clusterPackMap);
+//      LOG.info(clusterPackMap);
+//      
+//      
+      for(int i=0;i<conf.getInt(Constants.KmeansPackCount, 10);i++){
+        new KmeansBuildIPInvertedIndexDocSorted(conf,i).run();
+      }
+       //need to build these for each pack
+//      new BuildIntPostingsForwardIndex(conf).run();
     } else if (cmdline.hasOption(POSITIONAL_INDEX_LP)) {
       LOG.info(String.format(" -%s", POSITIONAL_INDEX_LP));
       conf.set(Constants.IndexPath, indexPath);
@@ -131,6 +211,6 @@ public class BuildIndex extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    ToolRunner.run(new BuildIndex(), args);
+    ToolRunner.run(new BuildIndexKmeans(), args);
   }
 }

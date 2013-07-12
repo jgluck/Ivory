@@ -1,6 +1,7 @@
 package ivory.core.util;
 
 import ivory.core.data.dictionary.FrequencySortedDictionary;
+import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.TermDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.data.stat.DfTableArray;

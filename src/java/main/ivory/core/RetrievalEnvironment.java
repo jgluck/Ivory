@@ -532,9 +532,27 @@ public class RetrievalEnvironment {
 	  return appendPath(indexPath,"kmeans_centroid");
 	}
 	
+	public String getClusterPackDir(){
+	  return appendPath(indexPath,"kmeans_cluster_packs");
+	}
+	
+	public String getClusterPackContainerPath(int i){
+	  String intermediate = getClusterPackDir();
+	  return appendPath(intermediate,"pack_"+i);
+	}
+	
+	public String getClusterPackPath(int i){
+	  String intermediate = getClusterPackContainerPath(i);
+	  return appendPath(intermediate,"part-0");
+	}
+	
 	public String getKmeansRandomDocNoPath(){
 	  return appendPath(indexPath,"kmeans_randomdocs");
 	}
+	 
+	public String getPostingsDirectory(int i) {
+	    return appendPath(indexPath, "postings_/"+i);
+	  }
 	
 	
 	public String getInitialDocnoDirectory(){
@@ -658,6 +676,26 @@ public class RetrievalEnvironment {
 	public void writeCollectionLength(long cnt)     { FSProperty.writeLong(fs, appendPath(indexPath, "property.CollectionLength"), cnt); }
 	public void writeCollectionAverageDocumentLength(float n) { FSProperty.writeFloat(fs, appendPath(indexPath, "property.CollectionAverageDocumentLength"), n); }
 
+	public void writeKmeansType(String type)   { FSProperty.writeString(fs, appendPath(indexPath, "property.KmeansType"), type); }
+	public String readKmeansType()      { return FSProperty.readString(fs, appendPath(indexPath, "property.KmeansType")); }
+	public int   readPackDocumentCount(int pack) { return FSProperty.readInt(fs, appendPath(indexPath, "pack_counts/property.CollectionDocumentCount_Pack_"+pack)); }
+	public void writePackDocumentCount(int pack, int n) { FSProperty.writeInt(fs, appendPath(indexPath, "pack_counts/property.CollectionDocumentCount_Pack_"+pack), n); }
+	public void createPackDocumentCountDir(){
+	  try{
+	  fs.mkdirs(new Path(appendPath(indexPath,"pack_counts")));
+	  }    catch (Exception e) {
+       e.printStackTrace();
+    }
+	  }
+	public void createPackDocumentDir(int i){
+	  try{
+	    fs.mkdirs(new Path(appendPath(this.getClusterPackDir(),"pack_"+i)));
+	  }catch(Exception e){
+	    e.printStackTrace();
+	  }
+	}
+	
+	
 	private static void testTerm(RetrievalEnvironment env, String term) {
 		long startTime = System.currentTimeMillis();
 

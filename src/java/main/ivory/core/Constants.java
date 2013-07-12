@@ -35,6 +35,9 @@ public class Constants {
   public static final String TargetStemmedStopwordList = "Ivory.TargetStemmedStopwordlist";
   public static final String TargetTokenizer = "Ivory.TargetTokenizer";
   public static final String TargetLanguage = "Ivory.TargetLang";
+  public static final String KmeansClusterCount = "Ivory.KmeansClusterCount";
+  public static final String KmeansDocumentType = "Ivory.KmeansDocumentType";
+  public static final String KmeansPackCount = "Ivory.KmeansPackCount";
 
   /**
    * Memory threshold for the LP indexing algorithm: spill in the map phase after memory fills up to

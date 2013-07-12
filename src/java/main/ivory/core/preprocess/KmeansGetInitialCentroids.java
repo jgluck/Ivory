@@ -16,8 +16,12 @@
 
 package ivory.core.preprocess;
 
+import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
+import ivory.core.data.index.PostingsList;
+import ivory.core.data.index.PostingsListDocSortedPositional;
 import ivory.core.util.RandomizedDocNos;
 import ivory.lsh.driver.PwsimEnvironment;
 
@@ -84,11 +88,11 @@ public class KmeansGetInitialCentroids extends PowerTool {
 //    
 //  }
 
+  
   private static class MyMapper extends MapReduceBase implements
       Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
 
     static IntWritable mDocno = new IntWritable();
-    private boolean normalize = false;
     private Vocab engVocabH;
     private ArrayListWritable<IntWritable> centroidDocNos;
     private String initialDocNoPath;
@@ -135,51 +139,12 @@ public class KmeansGetInitialCentroids extends PowerTool {
         e.printStackTrace();
       }
       
-      normalize = conf.getBoolean("Ivory.Normalize", false);
       initialDocNoPath = conf.get("InitialDocnoPath");
-      
-
-      
-      
-//      Integer numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
-//      String indexPath = conf.get("Ivory.IndexPath");
-//      RetrievalEnvironment env;
-//      int numDocs = 0;
-//      try {
-//        env = new RetrievalEnvironment(indexPath, fs);
-//        numDocs = env.readCollectionDocumentCount();
-//      } catch (IOException e) {
-//        // TODO Auto-generated catch block
-//        e.printStackTrace();
-//      }
-      
-    
-//      for(int i=0;i<numClusters;i++){
-//        IntWritable randomNumber = new IntWritable(1 + (int)(Math.random()*numDocs));
-//        while(initialCentroidDocs.contains(randomNumber)){
-//          randomNumber.set(1 + (int)(Math.random()*numDocs));
-//        }
-//        initialCentroidDocs.add(randomNumber);
-//      }
-//      docnoPath = new Path(initialDocNoPath);
-//      FSDataInputStream in;
-//      try {
-//        in = fs.open(docnoPath);
-//      } catch (IOException e1) {
-//        // TODO Auto-generated catch block
-//        e1.printStackTrace();
-//        throw new RuntimeException("Error opening the docnopath!");
-//      }
-//      docnos = new ArrayListWritable<IntWritable>();
-//      
-//      try{
-//        docnos.readFields(in);
-//      }catch (Exception e){
-//        e.printStackTrace();
-//        throw new RuntimeException("Error getting initial docnos back from hdfs!");
-//      }
       }
 
+//    THESE LINES SHOW ORIGINAL VERSION
+//    public void map (IntWritable docno, WeightedIntDocVector doc,
+//        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     
     public void map (IntWritable docno, WeightedIntDocVector doc,
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
@@ -197,7 +162,6 @@ public class KmeansGetInitialCentroids extends PowerTool {
 
   public static final String[] RequiredParameters = { "Ivory.NumMapTasks",
     "Ivory.IndexPath", 
-    "Ivory.Normalize",
   };
 
   public String[] getRequiredParameters() {
@@ -208,6 +172,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     super(conf);
   }
 
+  @SuppressWarnings("deprecation")
   public int runTool() throws Exception {
     sLogger.info("PowerTool: " + KmeansGetInitialCentroids.class.getName());
 
@@ -215,16 +180,21 @@ public class KmeansGetInitialCentroids extends PowerTool {
     FileSystem fs = FileSystem.get(conf);
     
 
-    String indexPath = getConf().get("Ivory.IndexPath");
+    String indexPath = getConf().get(Constants.IndexPath);
 
     RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
 
     String outputPath = env.getKmeansCentroidDirectory();
 //    String docnoDir = env.getInitialDocnoDirectory(); //I think I need to change this to the weighted int docvecs
-    int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
-    int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
-    String collectionName = getConf().get("Ivory.CollectionName");
+    int mapTasks = getConf().getInt(Constants.NumMapTasks, 0);
+    int minSplitSize = getConf().getInt(Constants.MinSplitSize, 0);
+    String collectionName = getConf().get(Constants.CollectionName);
 
+    String documentType = conf.get(Constants.KmeansDocumentType,
+        IntDocVector.class.getCanonicalName());
+    @SuppressWarnings("unchecked")
+    Class<? extends IntDocVector> documentClass =
+        (Class<? extends IntDocVector>) Class.forName(documentType);
      
     
     
@@ -234,12 +204,11 @@ public class KmeansGetInitialCentroids extends PowerTool {
     sLogger.info(" - NumMapTasks: " + mapTasks);
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
-//    DistributedCache.addCacheFile(new URI(vocabFile), conf);
-//    DistributedCache.addCacheFile(new URI(env.getKmeansRandomDocNoPath()), conf);
     DistributedCache.addCacheFile(new Path(env.getKmeansRandomDocNoPath()).toUri(), conf);
-//    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+
    
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
+//    Path inputPath = new Path(env.getIntDocVectorsDirectory());
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
     Path kMeansPath = new Path(outputPath);
 
@@ -258,16 +227,15 @@ public class KmeansGetInitialCentroids extends PowerTool {
     conf.setNumReduceTasks(0);
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
-    conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
     FileInputFormat.setInputPaths(conf, inputPath);
     FileOutputFormat.setOutputPath(conf, kMeansPath);
 
     conf.setInputFormat(SequenceFileInputFormat.class);
     conf.setMapOutputKeyClass(IntWritable.class);
-    conf.setMapOutputValueClass(WeightedIntDocVector.class);
+    conf.setMapOutputValueClass(documentClass);
     conf.setOutputFormat(SequenceFileOutputFormat.class);
     conf.setOutputKeyClass(IntWritable.class);
-    conf.setOutputValueClass(WeightedIntDocVector.class);
+    conf.setOutputValueClass(documentClass);
 
     conf.setMapperClass(MyMapper.class);
 
@@ -278,7 +246,8 @@ public class KmeansGetInitialCentroids extends PowerTool {
         + " seconds");
     Counters counters = rj.getCounters();
 
+    env.writeKmeansType(documentType);
 
-    return (int) getConf().getInt("Ivory.KmeansClusterCount", 5);
+    return (int) getConf().getInt(Constants.KmeansClusterCount, 5);
   }
 }

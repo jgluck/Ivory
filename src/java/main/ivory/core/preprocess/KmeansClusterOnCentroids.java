@@ -16,7 +16,9 @@
 
 package ivory.core.preprocess;
 
+import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
+import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.CLIRUtils;
 import ivory.core.util.RandomizedDocNos;
@@ -71,7 +73,8 @@ import edu.umd.hooka.alignment.HadoopAlign;
  *
  */
 public class KmeansClusterOnCentroids extends PowerTool {
-  private static final Logger sLogger = Logger.getLogger(BuildWeightedIntDocVectors.class);
+  private static final Logger sLogger = Logger.getLogger(KmeansClusterOnCentroids.class);
+//  private static ArrayList<WeightedIntDocVector> initialCentroids = null;
 
   static{
     sLogger.setLevel(Level.INFO);
@@ -88,6 +91,10 @@ public class KmeansClusterOnCentroids extends PowerTool {
     private String initialDocNoPath;
     private FileSystem fs; 
     Path targetDir;
+    Path[] localFiles;
+    Path localDir;
+    RandomizedDocNos docnorand;
+    private ArrayList<WeightedIntDocVector> initialCentroids;
     
     public void configure(JobConf conf){
       try {
@@ -98,13 +105,41 @@ public class KmeansClusterOnCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
+      
+      
+      try {
+        localFiles = DistributedCache.getLocalCacheFiles(conf);
+      } catch (IOException e2) {
+        // TODO Auto-generated catch block
+        sLogger.info("Failed to get local cache files");
+        e2.printStackTrace();
+      }
+       
+       sLogger.info("Local Files: :"+  localFiles);
+       for (Path p : localFiles) {
+       if(p.toString().contains("kmeans_centroid")){
+              sLogger.info("Found the Kmeans_CentroidFile");
+              localDir = p;
+           }
+       }
+       
+        docnorand = new RandomizedDocNos(conf,localDir);
+//        initialCentroids = new ArrayList<WeightedIntDocVector>();
+        initialCentroids = new ArrayList<WeightedIntDocVector>();
+        try {
+          docnorand.readCurrentCentroids(initialCentroids);
+        } catch (IOException e) {
+          sLogger.info("Failed to read in initial centroids in configure");
+          e.printStackTrace();
+        }
+      
     }
     
     public void reduce(IntWritable clusterMembership, Iterator<WeightedIntDocVector> vectors,
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter) throws IOException {
       // TODO Auto-generated method stub
       WeightedIntDocVector curr;
-      WeightedIntDocVector sum = new WeightedIntDocVector();
+      WeightedIntDocVector sum = new WeightedIntDocVector(initialCentroids.get(clusterMembership.get()).getDocLength(),initialCentroids.get(clusterMembership.get()).getWeightedTerms());
       float count = 0;
       while(vectors.hasNext()){
         curr=vectors.next();
@@ -129,6 +164,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     private Path docnoPath;
     private FileSystem fs; 
     private ArrayList<WeightedIntDocVector> initialCentroids;
+//    private ArrayList<IntDocVector> initialCentroids;
     ArrayListWritable<IntWritable>  docnos;
     RandomizedDocNos docnorand;
     Path[] localFiles;
@@ -161,6 +197,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
        }
        
        docnorand = new RandomizedDocNos(conf,localDir);
+//       initialCentroids = new ArrayList<WeightedIntDocVector>();
        initialCentroids = new ArrayList<WeightedIntDocVector>();
        try {
          docnorand.readCurrentCentroids(initialCentroids);
@@ -233,12 +270,11 @@ public class KmeansClusterOnCentroids extends PowerTool {
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
 
-    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+    Integer numClusters = getConf().getInt(Constants.KmeansClusterCount, 5);
    
     DistributedCache.addCacheFile(new Path(env.getCurrentCentroidPath()).toUri(), conf);
 //    conf.set("InitialDocnoPath", docnoDir);
     
-   
     
     
 //    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
@@ -254,7 +290,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     
     conf.setJobName(KmeansClusterOnCentroids.class.getSimpleName() + ":" + collectionName);
     conf.setNumMapTasks(mapTasks);
-    conf.setNumReduceTasks(numClusters);
+    conf.setNumReduceTasks(100); //TODO FIX THIS
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
