@@ -22,7 +22,7 @@ import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.data.index.PostingsList;
 import ivory.core.data.index.PostingsListDocSortedPositional;
-import ivory.core.util.KmeansUtility;
+import ivory.kmeans.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.File;

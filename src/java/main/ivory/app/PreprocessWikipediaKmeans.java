@@ -33,8 +33,8 @@ import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansFinalClusterStep;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
-import ivory.core.util.KmeansUtility;
 import ivory.core.util.ReadSequenceFile;
+import ivory.kmeans.util.KmeansUtility;
 
 import java.io.IOException;
 import java.util.ArrayList;

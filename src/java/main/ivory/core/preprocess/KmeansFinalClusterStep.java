@@ -21,7 +21,7 @@ import ivory.core.RetrievalEnvironment;
 import ivory.core.data.document.DocnoWeightedIntDocVectorPair;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.CLIRUtils;
-import ivory.core.util.KmeansUtility;
+import ivory.kmeans.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.BufferedReader;

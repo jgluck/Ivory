@@ -33,7 +33,7 @@ import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansFinalClusterStep;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
-import ivory.core.util.KmeansUtility;
+import ivory.kmeans.util.KmeansUtility;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
