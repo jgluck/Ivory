@@ -21,7 +21,7 @@ import ivory.core.RetrievalEnvironment;
 import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.CLIRUtils;
-import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.BufferedReader;
@@ -93,7 +93,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     Path targetDir;
     Path[] localFiles;
     Path localDir;
-    RandomizedDocNos docnorand;
+    KmeansUtility docnorand;
     private ArrayList<WeightedIntDocVector> initialCentroids;
     
     public void configure(JobConf conf){
@@ -123,7 +123,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
            }
        }
        
-        docnorand = new RandomizedDocNos(conf,localDir);
+        docnorand = new KmeansUtility(conf,localDir);
 //        initialCentroids = new ArrayList<WeightedIntDocVector>();
         initialCentroids = new ArrayList<WeightedIntDocVector>();
         try {
@@ -166,7 +166,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
     private ArrayList<WeightedIntDocVector> initialCentroids;
 //    private ArrayList<IntDocVector> initialCentroids;
     ArrayListWritable<IntWritable>  docnos;
-    RandomizedDocNos docnorand;
+    KmeansUtility docnorand;
     Path[] localFiles;
     Path localDir;
 
@@ -196,7 +196,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
          throw new RuntimeException("Error getting the filesystem conf");
        }
        
-       docnorand = new RandomizedDocNos(conf,localDir);
+       docnorand = new KmeansUtility(conf,localDir);
 //       initialCentroids = new ArrayList<WeightedIntDocVector>();
        initialCentroids = new ArrayList<WeightedIntDocVector>();
        try {

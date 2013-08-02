@@ -4,8 +4,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
@@ -13,12 +15,19 @@ import ivory.core.data.document.DocnoWeightedIntDocVectorPair;
 import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.LazyIntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
+import ivory.core.data.stat.DfTableArray;
+import ivory.core.data.stat.DocLengthTable;
+import ivory.core.data.stat.DocLengthTable2B;
+import ivory.core.data.stat.DocLengthTable4B;
+import ivory.core.preprocess.TrecClusterPackHandler;
+import ivory.pwsim.score.ScoringModel;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
@@ -27,10 +36,31 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.log4j.Logger;
 import org.mortbay.log.Log;
 
+import edu.umd.cloud9.collection.DocnoMapping;
+import edu.umd.cloud9.collection.Indexable;
+import edu.umd.cloud9.collection.trec.TrecDocnoMapping;
+import edu.umd.cloud9.collection.trec.TrecDocument;
+import edu.umd.cloud9.collection.trec.TrecDocumentInputFormat;
 import edu.umd.cloud9.io.array.ArrayListWritable;
+import edu.umd.cloud9.io.map.HMapIFW;
+import edu.umd.cloud9.util.map.MapIF;
 
-public class RandomizedDocNos {
-  private static final Logger sLogger = Logger.getLogger(RandomizedDocNos.class);
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.input.SAXBuilder;
+
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class KmeansUtility {
+  private static final Logger sLogger = Logger.getLogger(KmeansUtility.class);
   Integer numClusters;
   String indexPath;
   RetrievalEnvironment env;
@@ -42,7 +72,7 @@ public class RandomizedDocNos {
 //  Class<? extends IntDocVector> VectorClass = null;
   
     
-  public RandomizedDocNos(Configuration conf2){   
+  public KmeansUtility(Configuration conf2){   
     conf = conf2;
     numClusters = conf.getInt("Ivory.KmeansClusterCount", 5);
     indexPath = conf.get("Ivory.IndexPath");
@@ -55,19 +85,12 @@ public class RandomizedDocNos {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
-//    
-//    try {
-//      VectorClass = (Class<? extends IntDocVector>) Class.forName(env.readKmeansType());
-//    } catch (ClassNotFoundException e1) {
-//      // TODO Auto-generated catch block
-//      e1.printStackTrace();
-//    }
     
     initialCentroidDocs = new ArrayListWritable<IntWritable>();
     
   }
   
-  public RandomizedDocNos(JobConf conf2){   
+  public KmeansUtility(JobConf conf2){   
     conf = conf2;
     numClusters = conf.getInt(Constants.KmeansClusterCount, 5);
     indexPath = conf.get(Constants.IndexPath);
@@ -85,7 +108,7 @@ public class RandomizedDocNos {
     
   }
   
-  public RandomizedDocNos(JobConf conf2,Path local){   
+  public KmeansUtility(JobConf conf2,Path local){   
     conf = conf2;
     optional = local;
     numClusters = conf.getInt(Constants.KmeansClusterCount, 5);
@@ -452,6 +475,122 @@ public void packLazyVectors(HashMap<Integer,Integer> docnoToClusterMapping, Hash
    
 }
 
+public void packLazyVectorsEval(HashMap<Integer,Integer> docnoToClusterMapping, HashMap<Integer,Integer> clusterMapping){
+  env.createPackDocumentCountDir();
+  int numPacks = conf.getInt(Constants.KmeansPackCount, 10);
+  List<Path> paths = null;
+  SequenceFile.Writer out;
+  int[] packDocCounts = new int[numPacks];
+  ArrayList<Path> outPaths = new ArrayList<Path>();
+  ArrayList<SequenceFile.Writer> outStreams = new ArrayList<SequenceFile.Writer>();
+//  ArrayList<FSDataOutputStream> outStreams= new ArrayList<FSDataOutputStream>();
+  
+  for(int i=0;i<numPacks;i++){
+    packDocCounts[i] = 0;
+  }
+  
+  try {
+    fs.mkdirs(new Path(env.getOverIndex()));
+  } catch (IOException e2) {
+    Log.info("Failed to create directory for cluster packs");
+    // TODO Auto-generated catch block
+    e2.printStackTrace();
+  }
+  
+  for(int i=0;i<numPacks;i++){
+    try {
+      fs.mkdirs(new Path(env.getClusterPackContainerPathEval(i)));
+    } catch (IOException e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    }
+//    env.createPackDocumentDir(i);
+    outPaths.add(new Path(env.getClusterPackPathEval(i)));
+    outStreams.add(null);
+    out = null;
+    try {
+      out = SequenceFile.createWriter(fs,conf,outPaths.get(i),IntWritable.class,LazyIntDocVector.class);
+      
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      Log.info("Looks like we failed creating a sequence file writer for path: " + outPaths.get(i));
+      e.printStackTrace();
+    }
+    
+
+    outStreams.set(i, out);  
+  }
+  
+   try {
+    paths = getSequenceFileList(env.getIntDocVectorsDirectory(),"part-",fs);
+  } catch (FileNotFoundException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+   for(Path path: paths){
+     Log.info("Reading in IntDocVector Path: "+path);
+     try {
+       SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
+       IntWritable key = new IntWritable();
+       LazyIntDocVector value = new LazyIntDocVector();
+       while (reader.next(key, value)) {
+         int streamIndex = clusterMapping.get(docnoToClusterMapping.get(key.get()));
+         outStreams.get(streamIndex).append(key, value);
+         packDocCounts[streamIndex]++;
+         
+       }
+       reader.close();
+     } catch (IOException e) {
+       // TODO Auto-generated catch block
+       e.printStackTrace();
+     }
+   }
+   
+   try {
+     for(SequenceFile.Writer outIterator: outStreams){
+       outIterator.close();
+     }
+   } catch (IOException e) {
+     // TODO Auto-generated catch block
+     e.printStackTrace();
+   }
+   
+   for(int i = 0;i<numPacks;i++){
+     env.writePackDocumentCountEval(i, packDocCounts[i]);
+   }
+   
+}
+
+
+public void PrepareEvalDirs(){
+  int curPack = 0;
+  FileUtil fileHandler = new FileUtil();
+  int numPacks = conf.getInt(Constants.KmeansPackCount, 10);
+  List<Path> paths = null;
+  paths = new ArrayList<Path>();
+  paths.add(new Path(env.appendPath(indexPath,"property.CollectionAverageDocumentLength")));
+  paths.add(new Path(env.appendPath(indexPath,"property.CollectionName")));
+  paths.add(new Path(env.appendPath(indexPath,"property.CollectionTermCount")));
+  paths.add(new Path(env.appendPath(indexPath,"property.Tokenizer")));
+  
+  
+  for(int i=0;i<numPacks;i++){
+    Path curPackDir = new Path(env.getCurrentIndex(i));
+    for(Path p: paths){
+      try {
+        fileHandler.copy(fs, p, fs, curPackDir, false, true, conf);
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
+        Log.info("AHHH, failed to copy file: "+p);
+        e.printStackTrace();
+      }
+    }
+  }
+}
+
 public void bringPackMapping(HashMap<Integer,Integer> docnoToClusterMapping, HashMap<Integer,Integer> clusterMapping){
   int curPack = 0;
   List<Path> paths = null;
@@ -568,20 +707,378 @@ public void packClusters(HashMap<IntWritable,IntWritable> clusterMapping){
    }
 }
 
+//pack clusters into partitions
+public void packClustersEval(HashMap<IntWritable,IntWritable> clusterMapping){
+int curPack = 0;
+int numPacks = 100;
+List<Path> paths = null;
+FSDataOutputStream out;
+ArrayList<Path> outPaths = new ArrayList<Path>();
+ArrayList<FSDataOutputStream> outStreams= new ArrayList<FSDataOutputStream>();
+
+try {
+  fs.mkdirs(new Path(env.getOverIndex()));
+} catch (IOException e2) {
+  Log.info("Failed to create directory for overInded");
+  // TODO Auto-generated catch block
+  e2.printStackTrace();
+}
+
+for(int i=0;i<numPacks;i++){
+  try {
+    fs.mkdirs(new Path(env.getClusterPackContainerPathEval(i)));
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+  outPaths.add(new Path(env.getClusterPackPathEval(i)));
+  outStreams.add(null);
+  out = null;
+  try {
+    out = fs.create(outPaths.get(i));
+  } catch (IOException e1) {
+    Log.info("FAILED TO CREATE OUTPUT PATH: "+outPaths.get(i));
+    e1.printStackTrace();
+  }
+  outStreams.set(i, out);  
+}
+
+ try {
+  paths = getSequenceFileList(env.getKmeansFinalDirectory(),"part-",fs);
+} catch (FileNotFoundException e) {
+  // TODO Auto-generated catch block
+  e.printStackTrace();
+} catch (IOException e) {
+  // TODO Auto-generated catch block
+  e.printStackTrace();
+}
+ for(Path path: paths){
+   try {
+     SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
+     IntWritable key = new IntWritable();
+//     WeightedIntDocVector value = new WeightedIntDocVector();
+//     DocnoWeightedIntDocVectorPair value = new DocnoWeightedIntDocVectorPair();
+     IntWritable value = new IntWritable();
+     while (reader.next(key, value)) {
+       if(!clusterMapping.containsKey(key)){
+         clusterMapping.put(key, new IntWritable(curPack));
+         value.write(outStreams.get(curPack));
+//         (value.getDocno()).write(outStreams.get(curPack));
+//         (value.getVector()).write(outStreams.get(curPack));
+         curPack = (curPack + 1)%100;
+       }else{
+         value.write(outStreams.get(clusterMapping.get(key).get()));
+       }
+     }
+     reader.close();
+   } catch (IOException e) {
+     // TODO Auto-generated catch block
+     e.printStackTrace();
+   }
+ }
+ 
+ try {
+   for(FSDataOutputStream outIterator: outStreams){
+     outIterator.close();
+   }
+ } catch (IOException e) {
+   // TODO Auto-generated catch block
+   e.printStackTrace();
+ }
+}
+
 public int whichCluster(ArrayList<WeightedIntDocVector> initialCentroids, WeightedIntDocVector doc){
   float max = -500;
   float similarity = 0;
-  IntWritable cluster = new IntWritable(-1);
+//  IntWritable cluster = new IntWritable(-1);
   int it = 0;
   for(WeightedIntDocVector centroid: initialCentroids){
     similarity = CLIRUtils.cosine(doc, centroid);
     if(similarity>max){
       max = similarity;
-      cluster.set(it);
+//      cluster.set(it);
     }
     it= it +1;
   }
-  return cluster.get();
+  return it;
+}
+
+public WeightedIntDocVector convertLazyIntVToWeightedIntV(LazyIntDocVector original, int docno){
+  DocLengthTable mDLTable = null;
+  ScoringModel mScoreFn = null;
+  DfTableArray mDFTable = null;
+  
+  int docLen = 0;
+  
+  String dfFile;
+  String cfFile;
+  String dlFile;
+  
+  boolean normalize = false;
+  boolean shortDocLengths = false;
+  normalize = conf.getBoolean("Ivory.Normalize", false);
+  shortDocLengths = conf.getBoolean("Ivory.ShortDocLengths", true);
+  
+  
+  dfFile = env.getDfByIntData();
+  cfFile = env.getCfByIntData();
+  dlFile = env.getDoclengthsData().toString();
+  
+  try {
+    mDFTable = new DfTableArray(new Path(dfFile),fs);
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    Log.info("Failed to get dftable array from: "+ dfFile);
+    e.printStackTrace();
+  } 
+  
+  try {
+    if (shortDocLengths)
+      mDLTable = new DocLengthTable2B(new Path(dlFile), FileSystem.getLocal(conf));
+    else
+      mDLTable = new DocLengthTable4B(new Path(dlFile), FileSystem.getLocal(conf));
+  } catch (IOException e1) {
+    Log.info("Error loading dl table from " + dlFile);
+    e1.printStackTrace();
+  }
+  
+  try {
+    mScoreFn = (ScoringModel) Class.forName(conf.get("Ivory.ScoringModel")).newInstance();
+
+    // this only needs to be set once for the entire collection
+    mScoreFn.setDocCount(mDLTable.getDocCount());
+    mScoreFn.setAvgDocLength(mDLTable.getAvgDocLength());
+  } catch (Exception e) {
+    throw new RuntimeException("Error initializing Ivory.ScoringModel from "
+        + conf.get("Ivory.ScoringModel"));
+  }
+  
+  
+  HMapIFW vectorWeights = new HMapIFW();
+  
+  docLen = mDLTable.getDocLength(docno);
+  
+  IntDocVector.Reader r = null;
+  try {
+    r = original.getReader();
+  } catch (IOException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+  float wt, sum;
+  int term;
+  sum = 0;
+  while (r.hasMoreTerms()){
+    term = r.nextTerm();
+    mScoreFn.setDF(mDFTable.getDf(term));
+    wt = mScoreFn.computeDocumentWeight(r.getTf(), docLen);
+    vectorWeights.put(term, wt);
+    sum += wt * wt;
+  }
+  
+  if (normalize) {
+    /* length-normalize doc vectors */
+    sum = (float) Math.sqrt(sum);
+    for (MapIF.Entry e : vectorWeights.entrySet()) {
+      float score = vectorWeights.get(e.getKey());
+      vectorWeights.put(e.getKey(), score / sum);
+    }
+  }
+  WeightedIntDocVector weightedVector = new WeightedIntDocVector(docLen, vectorWeights);
+  
+  return weightedVector;
+}
+
+public void writePackMapping(HashMap<Integer,Integer> clusterPackMap, HashMap<Integer,Integer> docnoToClusterMap){
+  Path pathPackMapping = new Path(env.getKmeansPackMapping());
+  Path pathDocnoMapping = new Path(env.getKmeansDocnoMapping());
+  
+  SequenceFile.Writer outPackMapping = null;
+  SequenceFile.Writer outDocnoMapping = null;
+  
+  IntWritable key = new IntWritable();
+  IntWritable value = new IntWritable();
+  
+  try {
+    outPackMapping = SequenceFile.createWriter(fs,conf,pathPackMapping,IntWritable.class,IntWritable.class);
+    outDocnoMapping = SequenceFile.createWriter(fs,conf,pathDocnoMapping,IntWritable.class,IntWritable.class);    
+  } catch (IOException e1) {
+    // TODO Auto-generated catch block
+    e1.printStackTrace();
+  }
+  
+  Iterator packIt = clusterPackMap.entrySet().iterator();
+  while(packIt.hasNext()){
+    Map.Entry pairs = (Map.Entry) packIt.next();
+    key.set((Integer)pairs.getKey());
+    value.set((Integer)pairs.getValue());
+    
+    try {
+      outPackMapping.append(key, value);
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }       
+  }
+  
+  Iterator docnoIt = docnoToClusterMap.entrySet().iterator();
+  while(docnoIt.hasNext()){
+    Map.Entry pairs = (Map.Entry) docnoIt.next();
+    key.set((Integer)pairs.getKey());
+    value.set((Integer)pairs.getValue());    
+    try {
+      outDocnoMapping.append(key, value);
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }       
+  }
+  try{
+  outPackMapping.close();
+  outDocnoMapping.close();
+  }catch(Exception e){
+    e.printStackTrace();
+  }
+  
+}
+
+public int sortDocuments(HashMap<Integer,Integer>clusterPackMap, HashMap<Integer,Integer>docnoToClusterMap){
+//  String collectionPath = conf.get(Constants.CollectionPath);
+//  String collectionPath = "/shared/collections/trec/trec4-5_noCRFR.xml"; //HARD CODED
+  String collectionPath = "/user/jdg/trec4-5_noCRFR.xml"; //HARD CODED
+  String inputFormat = conf.get(Constants.InputFormat);
+  Path collection = new Path(collectionPath);
+  int numPacks = conf.getInt(Constants.KmeansPackCount, 10);
+  ArrayList<Path> outPaths = new ArrayList<Path>();
+  ArrayList<FSDataOutputStream> outStreams= new ArrayList<FSDataOutputStream>();
+  FSDataOutputStream out;
+  
+  for(int i=0;i<numPacks;i++){
+    try {
+      fs.mkdirs(new Path(env.getclusterPackCollectionPath(i)));
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    outPaths.add(new Path(env.getClusterPackCollection(i)));
+    outStreams.add(null);
+    out = null;
+    try {
+      out = fs.create(outPaths.get(i));
+    } catch (IOException e1) {
+      Log.info("FAILED TO CREATE OUTPUT PATH: "+outPaths.get(i));
+      e1.printStackTrace();
+    }
+    outStreams.set(i, out);  
+  }
+  
+  try {
+    FSDataInputStream inTrec = fs.open(collection);
+    SAXParserFactory factory = SAXParserFactory.newInstance();
+    SAXParser saxParser = factory.newSAXParser();
+    DocnoMapping docMapping;
+//    docMapping =
+//        (DocnoMapping) Class.forName(conf.get(Constants.DocnoMappingClass)).newInstance();
+    docMapping = (DocnoMapping) Class.forName(TrecDocnoMapping.class.getCanonicalName()).newInstance();
+    docMapping.loadMapping(env.getDocnoMappingData(), fs);
+    TrecClusterPackHandler handler = new TrecClusterPackHandler(clusterPackMap,docnoToClusterMap,docMapping,outStreams,docMapping);
+    saxParser.parse(inTrec, handler);
+  } catch (IOException e) {
+    Log.info("IO Exception in sax parser");
+    e.printStackTrace();
+  } catch (ParserConfigurationException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (SAXException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (InstantiationException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (IllegalAccessException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  } catch (ClassNotFoundException e) {
+    // TODO Auto-generated catch block
+    e.printStackTrace();
+  }
+  
+  
+  
+  for(int i=0;i<numPacks;i++){
+    try {
+      outStreams.get(i).flush();
+      outStreams.get(i).close();
+    } catch (IOException e) {
+      sLogger.info("Failed to close stream: "+i);
+      e.printStackTrace();
+    }
+  }
+  
+  
+    
+  return -1;
+}
+
+
+public int readPackMapping(HashMap<Integer,Integer>clusterPackMap, HashMap<Integer,Integer> docnoToClusterMap){
+  sLogger.info("About to begin reading in saved mappings");
+  Path pathPackMapping = new Path(env.getKmeansPackMapping());
+  Path pathDocnoMapping = new Path(env.getKmeansDocnoMapping());
+  
+  try {
+    if (!fs.exists(pathPackMapping)){
+      sLogger.info("packmappath doesn't exists!");
+      // find the last / in inFile's name and shorten to that then get the directory data
+      return -1;
+    }
+  } catch (IOException e1) {
+    // TODO Auto-generated catch block 
+    e1.printStackTrace();
+    return -1;
+  }
+  
+  try {
+    if (!fs.exists(pathDocnoMapping)){
+      sLogger.info("docnomappingpath doesn't exists!");
+      // find the last / in inFile's name and shorten to that then get the directory data
+      return -1;
+    }
+  } catch (IOException e1) {
+    // TODO Auto-generated catch block
+    e1.printStackTrace();
+    return -1;
+  }
+  
+//  FSDataInputStream inPackMapping = fs.open(pathPackMapping);
+//  FSDataInputStream inDocnoMapping = fs.open(pathDocnoMapping);
+  
+  try {
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, pathPackMapping, conf);
+    IntWritable key = new IntWritable();
+    IntWritable value = new IntWritable();
+    while (reader.next(key, value)) {
+      clusterPackMap.put(key.get(), value.get());
+    }
+    reader.close();
+  }catch(Exception e){
+    e.printStackTrace();
+    return -1;
+  }
+  
+  try {
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, pathDocnoMapping, conf);
+    IntWritable key = new IntWritable();
+    IntWritable value = new IntWritable();
+    while (reader.next(key, value)) {
+      docnoToClusterMap.put(key.get(), value.get());
+    }
+    reader.close();
+  }catch(Exception e){
+    e.printStackTrace();
+    return -1;
+  }
+  return 0;
 }
 
 public void collectCentroids(String p){

@@ -22,5 +22,7 @@
     <dependency org="org.apache.lucene" name="lucene-core" rev="3.5.0" conf="*->*,!sources,!javadoc"/>
     <dependency org="org.apache.lucene" name="lucene-analyzers" rev="3.5.0" conf="*->*,!sources,!javadoc"/>
     <dependency org="com.sna-projects.kamikaze" name="kamikaze" rev="3.0.3" conf="*->*,!sources,!javadoc"/>
+    <dependency org="org.jdom" name="jdom2" rev="2.0.5"
+        conf="*->*,!sources,!javadoc" />
   </dependencies>
 </ivy-module>

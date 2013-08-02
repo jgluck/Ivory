@@ -22,7 +22,7 @@ import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.data.index.PostingsList;
 import ivory.core.data.index.PostingsListDocSortedPositional;
-import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.File;
@@ -100,7 +100,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
     private FileSystem fs; 
     private ArrayList<IntWritable> initialCentroidDocs;
     ArrayListWritable<IntWritable>  docnos;
-    RandomizedDocNos docnorand;
+    KmeansUtility docnorand;
     Path[] localFiles;
     Path localDir;
 
@@ -130,7 +130,7 @@ public class KmeansGetInitialCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
-      docnorand = new RandomizedDocNos(conf,localDir);
+      docnorand = new KmeansUtility(conf,localDir);
       initialCentroidDocs = new ArrayList<IntWritable>();
       try {
         docnorand.readRandomDocs(initialCentroidDocs);

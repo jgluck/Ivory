@@ -254,7 +254,7 @@ public class KmeansBuildIPInvertedIndexDocSorted extends PowerTool {
     int reduceTasks = conf.getInt(Constants.NumReduceTasks, 0);
     int minSplitSize = conf.getInt(Constants.MinSplitSize, 0);
 //    int collectionDocCnt = env.readCollectionDocumentCount();
-    int collectionDocCnt = env.readPackDocumentCount(this.pack);
+    int collectionDocCnt = env.readPackDocumentCountEval(this.pack);
     conf.setInt(Constants.CollectionDocumentCount, collectionDocCnt);
 
     //int maxHeap = conf.getInt(Constants.MaxHeap, 2048);
@@ -277,8 +277,8 @@ public class KmeansBuildIPInvertedIndexDocSorted extends PowerTool {
       fs.mkdirs(new Path(indexPath));
     }
 
-    Path inputPath = new Path(env.getClusterPackPath(this.pack));
-    Path postingsPath = new Path(env.getPostingsDirectory(this.pack));
+    Path inputPath = new Path(env.getClusterPackPathEval(this.pack));
+    Path postingsPath = new Path(env.getPostingsDirectoryEval(this.pack));
 
     if (fs.exists(postingsPath)) {
       LOG.info("Postings already exist: no indexing will be performed.");
@@ -320,7 +320,7 @@ public class KmeansBuildIPInvertedIndexDocSorted extends PowerTool {
     job.waitForCompletion(true);
     LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
-    env.writePostingsType(postingsClass.getCanonicalName());
+    env.writePostingsTypeEval(postingsClass.getCanonicalName(),pack);
 
     return 0;
   }

@@ -27,12 +27,13 @@ import ivory.core.index.BuildIPInvertedIndexDocSorted;
 import ivory.core.index.BuildIntPostingsForwardIndex;
 import ivory.core.index.BuildLPInvertedIndexDocSorted;
 import ivory.core.index.KmeansBuildIPInvertedIndexDocSorted;
+import ivory.core.index.KmeansBuildIntPostingsForwardIndex;
 import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansFinalClusterStep;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
-import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.KmeansUtility;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -127,7 +128,7 @@ public class BuildIndexKmeans extends Configured implements Tool {
       
       //get some initial centroid numbers
       
-      RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
+      KmeansUtility docnoRandomizer = new KmeansUtility(conf);
       docnoRandomizer.getRandomDocs();
       
       //uncomment from here
@@ -162,20 +163,31 @@ public class BuildIndexKmeans extends Configured implements Tool {
       
      
       
-      
+      //comment starts here
+//      
       HashMap<Integer,Integer> clusterPackMap = new HashMap<Integer,Integer>();
       HashMap<Integer,Integer> docnoToClusterMap = new HashMap<Integer,Integer>();  
-      docnoRandomizer.bringPackMapping(docnoToClusterMap, clusterPackMap);
-//      docnoRandomizer.OutputDocNosTest(docnoToClusterMap);
-      docnoRandomizer.packLazyVectors(docnoToClusterMap, clusterPackMap);
-//      LOG.info(clusterPackMap);
+////      docnoRandomizer.bringPackMapping(docnoToClusterMap, clusterPackMap);
+////      docnoRandomizer.packLazyVectorsEval(docnoToClusterMap, clusterPackMap);
+////      docnoRandomizer.PrepareEvalDirs();
+      
+////      docnoRandomizer.writePackMapping(clusterPackMap, docnoToClusterMap);
+       
+////      for(int i=0;i<conf.getInt(Constants.KmeansPackCount, 10);i++){
+////        new KmeansBuildIPInvertedIndexDocSorted(conf,i).run();
+////      }
 //      
-//      
-      for(int i=0;i<conf.getInt(Constants.KmeansPackCount, 10);i++){
-        new KmeansBuildIPInvertedIndexDocSorted(conf,i).run();
-      }
+      //comment up to here
+      
+      
        //need to build these for each pack
-//      new BuildIntPostingsForwardIndex(conf).run();
+////      for(int i=0;i<conf.getInt(Constants.KmeansPackCount, 10);i++){
+////        new KmeansBuildIntPostingsForwardIndex(conf,i).run();
+////      }
+      docnoRandomizer.readPackMapping(clusterPackMap, docnoToClusterMap);
+      docnoRandomizer.sortDocuments(clusterPackMap, docnoToClusterMap);
+      
+      
     } else if (cmdline.hasOption(POSITIONAL_INDEX_LP)) {
       LOG.info(String.format(" -%s", POSITIONAL_INDEX_LP));
       conf.set(Constants.IndexPath, indexPath);

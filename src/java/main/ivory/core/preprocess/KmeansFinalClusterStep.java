@@ -21,7 +21,7 @@ import ivory.core.RetrievalEnvironment;
 import ivory.core.data.document.DocnoWeightedIntDocVectorPair;
 import ivory.core.data.document.WeightedIntDocVector;
 import ivory.core.util.CLIRUtils;
-import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
 
 import java.io.BufferedReader;
@@ -124,7 +124,7 @@ public class KmeansFinalClusterStep extends PowerTool {
     private FileSystem fs; 
     private ArrayList<WeightedIntDocVector> initialCentroids;
     ArrayListWritable<IntWritable>  docnos;
-    RandomizedDocNos docnorand;
+    KmeansUtility docnorand;
     Path[] localFiles;
     Path localDir;
 
@@ -154,7 +154,7 @@ public class KmeansFinalClusterStep extends PowerTool {
          throw new RuntimeException("Error getting the filesystem conf");
        }
        
-       docnorand = new RandomizedDocNos(conf,localDir);
+       docnorand = new KmeansUtility(conf,localDir);
        initialCentroids = new ArrayList<WeightedIntDocVector>();
        try {
          docnorand.readCurrentCentroids(initialCentroids);

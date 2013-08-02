@@ -33,7 +33,7 @@ import ivory.core.preprocess.KmeansClusterOnCentroids;
 import ivory.core.preprocess.KmeansFinalClusterStep;
 import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
-import ivory.core.util.RandomizedDocNos;
+import ivory.core.util.KmeansUtility;
 import ivory.core.util.ReadSequenceFile;
 
 import java.io.IOException;
@@ -335,7 +335,7 @@ public class PreprocessWikipediaKmeans extends Configured implements Tool {
       
       LOG.info("about to start my nonsense");
       
-      RandomizedDocNos docnoRandomizer = new RandomizedDocNos(conf);
+      KmeansUtility docnoRandomizer = new KmeansUtility(conf);
       docnoRandomizer.getRandomDocs();
       ArrayList<WeightedIntDocVector> testArray = new ArrayList<WeightedIntDocVector>();
 //      docnoRandomizer.readRandomDocs(testArray);

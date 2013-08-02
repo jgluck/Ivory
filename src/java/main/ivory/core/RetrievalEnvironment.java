@@ -512,6 +512,14 @@ public class RetrievalEnvironment {
 		return appendPath(indexPath, "wt-int-doc-vectors/");
 	}
 	
+	public String getKmeansPackMapping(){
+	  return appendPath(indexPath,"kmeans_pack_mapping");
+	}
+	
+	public String getKmeansDocnoMapping(){
+	  return appendPath(indexPath,"kmeans_docno_mapping");
+	}
+	
 	public String getKmeansVectorDirectory(){
 	  return appendPath(indexPath,"kmeans_clustering/");
 	}
@@ -532,6 +540,49 @@ public class RetrievalEnvironment {
 	  return appendPath(indexPath,"kmeans_centroid");
 	}
 	
+	//begin test eval functions
+	
+  public String getPostingsIndexDataEval(int i) {
+    return appendPath(getCurrentIndex(i), "postings-index.dat");
+  }
+
+	
+	public String getPostingsDirectoryEval(int i) {
+    return appendPath(getCurrentIndex(i), "postings");
+  }
+	
+	public void writePostingsTypeEval(String type,int pack)   { FSProperty.writeString(fs, appendPath(getCurrentIndex(pack), "property.PostingsType"), type); }
+
+	
+	public String getOverIndex(){
+	  return appendPath(indexPath,"eval-indices");
+	}
+	
+	public String getCurrentIndex(int i){
+	  return appendPath(getOverIndex(),"index-trec-"+i);
+	}
+	
+	public String getClusterPackContainerPathEval(int i){
+	  return appendPath(getCurrentIndex(i),"int-doc-vectors");
+	}
+	
+	public String getclusterPackCollectionPath(int i){
+	  return appendPath(getCurrentIndex(i),"trec-pack");
+	}
+	
+	 public String getClusterPackCollection(int i){
+	    return appendPath(getClusterPackContainerPathEval(i),"trec4-5_noCRFR.xml");
+	  }
+	
+	public String getClusterPackPathEval(int i){
+	  return appendPath(getClusterPackContainerPathEval(i),"part-0");
+	}
+	
+	public int   readPackDocumentCountEval(int pack) { return FSProperty.readInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocumentCount")); }
+  public void writePackDocumentCountEval(int pack, int n) { FSProperty.writeInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocumentCount"), n); }
+  
+	//end test eval functions
+	
 	public String getClusterPackDir(){
 	  return appendPath(indexPath,"kmeans_cluster_packs");
 	}
@@ -551,9 +602,13 @@ public class RetrievalEnvironment {
 	}
 	 
 	public String getPostingsDirectory(int i) {
-	    return appendPath(indexPath, "postings_/"+i);
+	    return appendPath(indexPath, "postings_"+i);
 	  }
 	
+	
+	 public String getPostingsIndexData(int i) {
+	    return appendPath(indexPath, "postings-index_" + i + ".dat");
+	  }
 	
 	public String getInitialDocnoDirectory(){
 	  return appendPath(indexPath,"temp_docno/");
