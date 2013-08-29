@@ -19,6 +19,8 @@ package ivory.core.data.index;
 import java.util.Arrays;
 import java.util.BitSet;
 
+import org.mortbay.log.Log;
+
 /**
  * @author Don Metzler
  */
@@ -40,7 +42,10 @@ public class ProximityPostingsReaderUnorderedWindow extends ProximityPostingsRea
   @Override
   protected short countMatches() {
     int matches = 0;
-
+//    if(readers.length==0){
+//      System.out.println("JON: LOOK HERE!! - "+readers.length);
+//      System.out.println("Jon: size - ." +this.size);
+//    }
     // Merge all position lists into single stream.
     int[] positions = readers[0].getPositions();
     int[] ids = new int[positions.length];

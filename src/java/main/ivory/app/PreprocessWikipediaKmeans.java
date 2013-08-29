@@ -29,11 +29,11 @@ import ivory.core.preprocess.BuildTranslatedTermDocVectors;
 import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.preprocess.BuildWeightedTermDocVectors;
 import ivory.core.preprocess.ComputeGlobalTermStatistics;
-import ivory.core.preprocess.KmeansClusterOnCentroids;
-import ivory.core.preprocess.KmeansFinalClusterStep;
-import ivory.core.preprocess.KmeansGetInitialCentroids;
 import ivory.core.tokenize.TokenizerFactory;
 import ivory.core.util.ReadSequenceFile;
+import ivory.kmeans.preprocess.KmeansClusterOnCentroids;
+import ivory.kmeans.preprocess.KmeansFinalClusterStep;
+import ivory.kmeans.preprocess.KmeansGetInitialCentroids;
 import ivory.kmeans.util.KmeansUtility;
 
 import java.io.IOException;

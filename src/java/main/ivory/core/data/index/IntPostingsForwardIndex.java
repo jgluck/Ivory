@@ -48,6 +48,21 @@ public class IntPostingsForwardIndex {
   private final String postingsPath;
   private final Configuration conf;
 
+  public IntPostingsForwardIndex(String indexPath, FileSystem fs, boolean isKmeans) throws IOException{
+    Preconditions.checkNotNull(indexPath);
+    Preconditions.checkNotNull(fs);
+    
+    this.conf = fs.getConf();
+    RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
+    postingsPath = env.getPostingsDirectory();
+    
+    FSDataInputStream posInput = fs.open(new Path(env.getPostingsIndexData()));
+    
+    int l = posInput.readInt();
+    positions = new long[l];
+    
+  }
+  
   public IntPostingsForwardIndex(String indexPath, FileSystem fs) throws IOException {
     Preconditions.checkNotNull(indexPath);
     Preconditions.checkNotNull(fs);

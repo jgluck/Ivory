@@ -14,12 +14,13 @@
  * permissions and limitations under the License.
  */
 
-package ivory.core.preprocess;
+package ivory.kmeans.preprocess;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
-import ivory.core.data.document.IntDocVector;
+import ivory.core.data.document.DocnoWeightedIntDocVectorPair;
 import ivory.core.data.document.WeightedIntDocVector;
+import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.core.util.CLIRUtils;
 import ivory.kmeans.util.KmeansUtility;
 import ivory.lsh.driver.PwsimEnvironment;
@@ -31,6 +32,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -54,6 +56,7 @@ import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.mortbay.log.Log;
 
 import edu.umd.cloud9.example.memcached.demo.WordCount.MyReducer;
 import edu.umd.cloud9.io.array.ArrayListWritable;
@@ -65,16 +68,13 @@ import edu.umd.hooka.Vocab;
 import edu.umd.hooka.alignment.HadoopAlign;
 
 /**
- * Map term doc vectors into int doc vectors using the term-to-id mapping. 
- * This task is the same in either cross-lingual or mono-lingual case. That is, this task works for the case where doc vectors are translated into English and the case where doc vectors are originally in English.
- * Also, weights in doc vector are normalized.
- * 
- * @author ferhanture
+ * This time we don't want to update the centroids. We find cluster membership for each document.
+ * Then we output them. with membership information.
+ * @author jgluck
  *
  */
-public class KmeansClusterOnCentroids extends PowerTool {
-  private static final Logger sLogger = Logger.getLogger(KmeansClusterOnCentroids.class);
-//  private static ArrayList<WeightedIntDocVector> initialCentroids = null;
+public class KmeansFinalClusterStep extends PowerTool {
+  private static final Logger sLogger = Logger.getLogger(BuildWeightedIntDocVectors.class);
 
   static{
     sLogger.setLevel(Level.INFO);
@@ -86,15 +86,16 @@ public class KmeansClusterOnCentroids extends PowerTool {
     OOV, NEG
   }
   
+  /**
+   * Outputs Key: Clustermembership Value: Documentnumber-Document pair
+   * @author jgluck
+   *
+   */
   private static class MyReducer extends MapReduceBase implements
-  Reducer<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+  Reducer<IntWritable, DocnoWeightedIntDocVectorPair, IntWritable, IntWritable> {
     private String initialDocNoPath;
     private FileSystem fs; 
     Path targetDir;
-    Path[] localFiles;
-    Path localDir;
-    KmeansUtility docnorand;
-    private ArrayList<WeightedIntDocVector> initialCentroids;
     
     public void configure(JobConf conf){
       try {
@@ -105,57 +106,25 @@ public class KmeansClusterOnCentroids extends PowerTool {
         throw new RuntimeException("Error getting the filesystem conf");
       }
       
-      
-      
-      try {
-        localFiles = DistributedCache.getLocalCacheFiles(conf);
-      } catch (IOException e2) {
-        // TODO Auto-generated catch block
-        sLogger.info("Failed to get local cache files");
-        e2.printStackTrace();
-      }
-       
-       sLogger.info("Local Files: :"+  localFiles);
-       for (Path p : localFiles) {
-       if(p.toString().contains("kmeans_centroid")){
-              sLogger.info("Found the Kmeans_CentroidFile");
-              localDir = p;
-           }
-       }
-       
-        docnorand = new KmeansUtility(conf,localDir);
-//        initialCentroids = new ArrayList<WeightedIntDocVector>();
-        initialCentroids = new ArrayList<WeightedIntDocVector>();
-        try {
-          docnorand.readCurrentCentroids(initialCentroids);
-        } catch (IOException e) {
-          sLogger.info("Failed to read in initial centroids in configure");
-          e.printStackTrace();
-        }
-      
     }
     
-    public void reduce(IntWritable clusterMembership, Iterator<WeightedIntDocVector> vectors,
-        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter) throws IOException {
-      // TODO Auto-generated method stub
-      WeightedIntDocVector curr;
-      WeightedIntDocVector sum = new WeightedIntDocVector(initialCentroids.get(clusterMembership.get()).getDocLength(),initialCentroids.get(clusterMembership.get()).getWeightedTerms());
-      float count = 0;
+    public void reduce(IntWritable clusterMembership, Iterator<DocnoWeightedIntDocVectorPair> vectors,
+        OutputCollector<IntWritable, IntWritable> output, Reporter reporter) throws IOException {
+      Log.info("Adding vectors with cluster membership: " + clusterMembership);
       while(vectors.hasNext()){
-        curr=vectors.next();
-        sum.plus(curr);
-        count = count + 1;
+        output.collect(clusterMembership, vectors.next().getDocno());
       }
-      sum.div(count);
-      sLogger.info("New vector: " + sum);
-      output.collect(clusterMembership, sum);
     }
-    
-    
   }
     
+ /**
+  * Works almost the same as the mapper in cluster on centroids but includes the
+  * document number of the output.
+  * @author jgluck
+  *
+  */
   private static class MyMapper extends MapReduceBase implements
-      Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+      Mapper<IntWritable, WeightedIntDocVector, IntWritable, DocnoWeightedIntDocVectorPair> {
 
     static IntWritable mDocno = new IntWritable();
     private boolean normalize = false;
@@ -164,7 +133,6 @@ public class KmeansClusterOnCentroids extends PowerTool {
     private Path docnoPath;
     private FileSystem fs; 
     private ArrayList<WeightedIntDocVector> initialCentroids;
-//    private ArrayList<IntDocVector> initialCentroids;
     ArrayListWritable<IntWritable>  docnos;
     KmeansUtility docnorand;
     Path[] localFiles;
@@ -197,7 +165,6 @@ public class KmeansClusterOnCentroids extends PowerTool {
        }
        
        docnorand = new KmeansUtility(conf,localDir);
-//       initialCentroids = new ArrayList<WeightedIntDocVector>();
        initialCentroids = new ArrayList<WeightedIntDocVector>();
        try {
          docnorand.readCurrentCentroids(initialCentroids);
@@ -212,12 +179,13 @@ public class KmeansClusterOnCentroids extends PowerTool {
 
     
     public void map (IntWritable docno, WeightedIntDocVector doc,
-        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
+        OutputCollector<IntWritable, DocnoWeightedIntDocVectorPair> output, Reporter reporter)
     throws IOException {	
       float max = -500;
       float similarity = 0;
       IntWritable cluster = new IntWritable(0);
       int it = 0;
+      DocnoWeightedIntDocVectorPair toOutput = new DocnoWeightedIntDocVectorPair(docno,doc);
       for(WeightedIntDocVector centroid: initialCentroids){
         similarity = CLIRUtils.cosine(doc, centroid);
         if(similarity>max){
@@ -226,7 +194,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
         }
         it= it +1;
       }
-      output.collect(cluster, doc); //second mdocno should be what cluster we want
+      output.collect(cluster, toOutput); //second mdocno should be what cluster we want
     }
   }
 
@@ -239,14 +207,14 @@ public class KmeansClusterOnCentroids extends PowerTool {
     return RequiredParameters;
   }
 
-  public KmeansClusterOnCentroids(Configuration conf) {
+  public KmeansFinalClusterStep(Configuration conf) {
     super(conf);
   }
 
   public int runTool() throws Exception {
-    sLogger.info("PowerTool: " + KmeansClusterOnCentroids.class.getName());
+    sLogger.info("PowerTool: " + KmeansFinalClusterStep.class.getName());
 
-    JobConf conf = new JobConf(getConf(), KmeansClusterOnCentroids.class);
+    JobConf conf = new JobConf(getConf(), KmeansFinalClusterStep.class);
     FileSystem fs = FileSystem.get(conf);
 
     String indexPath = getConf().get("Ivory.IndexPath");
@@ -255,7 +223,7 @@ public class KmeansClusterOnCentroids extends PowerTool {
 
     
     String centroidPath = env.getKmeansCentroidDirectory();
-    String outputPath = env.getKmeansCentroidDirectory(conf.getInt("CurrentRun", 0));
+    String outputPath = env.getKmeansFinalDirectory();
     int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
     int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
     String collectionName = getConf().get("Ivory.CollectionName");
@@ -273,13 +241,10 @@ public class KmeansClusterOnCentroids extends PowerTool {
     Integer numClusters = getConf().getInt(Constants.KmeansClusterCount, 5);
    
     DistributedCache.addCacheFile(new Path(env.getCurrentCentroidPath()).toUri(), conf);
-//    conf.set("InitialDocnoPath", docnoDir);
+
     
-    
-    
-//    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
     Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
-    //we really need to choose numClusters docids and get theri vectors sideloaded in
+
     Path kMeansPath = new Path(outputPath);
 
     if (fs.exists(kMeansPath)) {
@@ -288,9 +253,9 @@ public class KmeansClusterOnCentroids extends PowerTool {
     }
     
     
-    conf.setJobName(KmeansClusterOnCentroids.class.getSimpleName() + ":" + collectionName);
+    conf.setJobName(KmeansFinalClusterStep.class.getSimpleName() + ":" + collectionName);
     conf.setNumMapTasks(mapTasks);
-    conf.setNumReduceTasks(100); //TODO FIX THIS
+    conf.setNumReduceTasks(100); //TODO FIX NUM REDUCERS
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
@@ -299,10 +264,10 @@ public class KmeansClusterOnCentroids extends PowerTool {
 
     conf.setInputFormat(SequenceFileInputFormat.class);
     conf.setMapOutputKeyClass(IntWritable.class);
-    conf.setMapOutputValueClass(WeightedIntDocVector.class);
+    conf.setMapOutputValueClass(DocnoWeightedIntDocVectorPair.class);
     conf.setOutputFormat(SequenceFileOutputFormat.class);
     conf.setOutputKeyClass(IntWritable.class);
-    conf.setOutputValueClass(WeightedIntDocVector.class);
+    conf.setOutputValueClass(IntWritable.class);
    
 
     conf.setMapperClass(MyMapper.class);

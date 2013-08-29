@@ -19,6 +19,8 @@ package ivory.core.data.index;
 import java.util.Arrays;
 import java.util.BitSet;
 
+import com.google.common.base.Preconditions;
+
 /**
  * @author Don Metzler
  */
@@ -32,7 +34,6 @@ public class ProximityPostingsReaderOrderedWindow extends ProximityPostingsReade
 
   public ProximityPostingsReaderOrderedWindow(PostingsReader[] readers, int size) {
     super(readers, size);
-
     numReaders = readers.length;
     matchedIds = new BitSet(numReaders);
   }

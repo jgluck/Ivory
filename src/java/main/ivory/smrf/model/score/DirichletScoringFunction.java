@@ -16,10 +16,12 @@
 
 package ivory.smrf.model.score;
 
+
 import ivory.core.util.XMLTools;
 import ivory.smrf.model.GlobalEvidence;
 import ivory.smrf.model.GlobalTermEvidence;
 
+import org.apache.log4j.Logger;
 import org.w3c.dom.Node;
 
 /**
@@ -28,6 +30,7 @@ import org.w3c.dom.Node;
  * @author Don Metzler
  */
 public class DirichletScoringFunction extends ScoringFunction {
+  private static final Logger LOG = Logger.getLogger(DirichletScoringFunction.class);
   protected float mu = 2500.0f;    // Smoothing parameter.
   protected float backgroundProb;  // Background probability.
   protected boolean isOOV = false; // Is this term OOV?

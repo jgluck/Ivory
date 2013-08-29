@@ -14,27 +14,18 @@
  * permissions and limitations under the License.
  */
 
-package ivory.core.preprocess;
+package ivory.kmeans.todelete;
 
-import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
-import ivory.core.data.document.IntDocVector;
 import ivory.core.data.document.WeightedIntDocVector;
-import ivory.core.data.index.PostingsList;
-import ivory.core.data.index.PostingsListDocSortedPositional;
-import ivory.kmeans.util.KmeansUtility;
+import ivory.core.preprocess.BuildWeightedIntDocVectors;
 import ivory.lsh.driver.PwsimEnvironment;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
@@ -46,7 +37,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
@@ -54,7 +44,6 @@ import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import edu.umd.cloud9.io.array.ArrayListWritable;
 import edu.umd.cloud9.io.map.HMapIFW;
 import edu.umd.cloud9.io.map.HMapSFW;
 import edu.umd.cloud9.util.PowerTool;
@@ -70,8 +59,8 @@ import edu.umd.hooka.alignment.HadoopAlign;
  * @author ferhanture
  *
  */
-public class KmeansGetInitialCentroids extends PowerTool {
-  private static final Logger sLogger = Logger.getLogger(KmeansGetInitialCentroids.class);
+public class KmeansTermDocVectors extends PowerTool {
+  private static final Logger sLogger = Logger.getLogger(BuildWeightedIntDocVectors.class);
 
   static{
     sLogger.setLevel(Level.INFO);
@@ -83,119 +72,101 @@ public class KmeansGetInitialCentroids extends PowerTool {
     OOV, NEG
   }
 
-//  private static class MyReducer extends MapReduceBase implements
-//    Reducer<IntWritable,WeightedIntDocVector>{
-//    
-//  }
-
-  
   private static class MyMapper extends MapReduceBase implements
-      Mapper<IntWritable, WeightedIntDocVector, IntWritable, WeightedIntDocVector> {
+      Mapper<IntWritable, HMapSFW, IntWritable, WeightedIntDocVector> {
 
     static IntWritable mDocno = new IntWritable();
+    private boolean normalize = false;
     private Vocab engVocabH;
-    private ArrayListWritable<IntWritable> centroidDocNos;
-    private String initialDocNoPath;
-    private Path docnoPath;
-    private FileSystem fs; 
-    private ArrayList<IntWritable> initialCentroidDocs;
-    ArrayListWritable<IntWritable>  docnos;
-    KmeansUtility docnorand;
-    Path[] localFiles;
-    Path localDir;
 
     public void configure(JobConf conf){
-     try {
-      localFiles = DistributedCache.getLocalCacheFiles(conf);
-    } catch (IOException e2) {
-      // TODO Auto-generated catch block
-      sLogger.info("Failed to get local cache files");
-      e2.printStackTrace();
-    }
-     
-     sLogger.info("Local Files: :"+  localFiles);
-     for (Path p : localFiles) {
-     if(p.toString().contains("kmeans_randomdocs")){
-            sLogger.info("It contained it!!!!");
-            localDir = p;
-         }
-     }
-     
-     
-      try {
-        fs = FileSystem.get(conf);
-      } catch (IOException e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-        throw new RuntimeException("Error getting the filesystem conf");
-      }
-      
-      docnorand = new KmeansUtility(conf,localDir);
-      initialCentroidDocs = new ArrayList<IntWritable>();
-      try {
-        docnorand.readRandomDocs(initialCentroidDocs);
-      } catch (IOException e) {
-        sLogger.info("Failed to read in initial centroids in configure");
-        e.printStackTrace();
-      }
-      
-      initialDocNoPath = conf.get("InitialDocnoPath");
-      }
+      normalize = conf.getBoolean("Ivory.Normalize", false);
 
-//    THESE LINES SHOW ORIGINAL VERSION
-//    public void map (IntWritable docno, WeightedIntDocVector doc,
-//        OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
-    
-    public void map (IntWritable docno, WeightedIntDocVector doc,
+      try {
+        Path[] localFiles = DistributedCache.getLocalCacheFiles(conf);
+
+        String vocabFile = conf.get("Ivory.FinalVocab");
+        vocabFile = vocabFile.substring(vocabFile.lastIndexOf("/") + 1);
+
+        for (Path p : localFiles) {
+          if (p.toString().contains(vocabFile)) {
+            engVocabH = HadoopAlign.loadVocab(p, FileSystem.getLocal(conf));
+          }
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+        throw new RuntimeException("Error initializing vocab data!");
+      }
+    }
+
+    WeightedIntDocVector weightedVectorOut = new WeightedIntDocVector();
+    HMapIFW weightedVector = new HMapIFW();
+
+    float sum2;
+    public void map(IntWritable docno, HMapSFW doc,
         OutputCollector<IntWritable, WeightedIntDocVector> output, Reporter reporter)
     throws IOException {	
       mDocno.set(docno.get());
-      if(initialCentroidDocs.contains(mDocno)){
-        sLogger.info("mDocno:" + mDocno.get() + " was contained");
-        output.collect(mDocno, doc);
-      }else{
-        ;
+      weightedVector.clear();
+
+      sLogger.debug("===================================BEGIN READ DOC");
+      sum2 = 0;
+
+      for (MapKF.Entry<String> entry : doc.entrySet()) {
+        String eTerm = entry.getKey();
+        int e = engVocabH.get(eTerm);
+        if (e < 0) {
+          sLogger.debug(eTerm+ " term in doc not found in aligner vocab");
+          continue;
+        }
+        float score = entry.getValue(); 
+        if (normalize) {
+          sum2+=score*score;
+        }
+        weightedVector.put(e, score);
       }
+      sLogger.debug("===================================END READ DOC");
+
+      weightedVectorOut.setWeightedTerms(weightedVector);
+      if (normalize) {
+        /*length-normalize doc vectors*/
+        sum2 = (float) Math.sqrt(sum2);
+        weightedVectorOut.normalizeWith(sum2);
+      }
+      output.collect(mDocno, weightedVectorOut);
       reporter.incrCounter(Docs.Total, 1);
     }
   }
 
   public static final String[] RequiredParameters = { "Ivory.NumMapTasks",
     "Ivory.IndexPath", 
+    "Ivory.Normalize",
   };
 
   public String[] getRequiredParameters() {
     return RequiredParameters;
   }
 
-  public KmeansGetInitialCentroids(Configuration conf) {
+  public KmeansTermDocVectors(Configuration conf) {
     super(conf);
   }
 
-  @SuppressWarnings("deprecation")
   public int runTool() throws Exception {
-    sLogger.info("PowerTool: " + KmeansGetInitialCentroids.class.getName());
+    sLogger.info("PowerTool: " + KmeansTermDocVectors.class.getName());
 
-    JobConf conf = new JobConf(getConf(), KmeansGetInitialCentroids.class);
+    JobConf conf = new JobConf(getConf(), KmeansTermDocVectors.class);
     FileSystem fs = FileSystem.get(conf);
-    
 
-    String indexPath = getConf().get(Constants.IndexPath);
+    String indexPath = getConf().get("Ivory.IndexPath");
 
     RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
 
-    String outputPath = env.getKmeansCentroidDirectory();
-//    String docnoDir = env.getInitialDocnoDirectory(); //I think I need to change this to the weighted int docvecs
-    int mapTasks = getConf().getInt(Constants.NumMapTasks, 0);
-    int minSplitSize = getConf().getInt(Constants.MinSplitSize, 0);
-    String collectionName = getConf().get(Constants.CollectionName);
+    String outputPath = env.getKmeansVectorDirectory();
+    String centroidPath = env.getKmeansCentroidDirectory();
+    int mapTasks = getConf().getInt("Ivory.NumMapTasks", 0);
+    int minSplitSize = getConf().getInt("Ivory.MinSplitSize", 0);
+    String collectionName = getConf().get("Ivory.CollectionName");
 
-    String documentType = conf.get(Constants.KmeansDocumentType,
-        IntDocVector.class.getCanonicalName());
-    @SuppressWarnings("unchecked")
-    Class<? extends IntDocVector> documentClass =
-        (Class<? extends IntDocVector>) Class.forName(documentType);
-     
     
     
     sLogger.info("Characteristics of the collection:");
@@ -204,38 +175,35 @@ public class KmeansGetInitialCentroids extends PowerTool {
     sLogger.info(" - NumMapTasks: " + mapTasks);
     sLogger.info(" - MinSplitSize: " + minSplitSize);
 
-    DistributedCache.addCacheFile(new Path(env.getKmeansRandomDocNoPath()).toUri(), conf);
-
-   
-//    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
-//    Path inputPath = new Path(env.getIntDocVectorsDirectory());
-    Path inputPath = new Path(PwsimEnvironment.getIntDocvectorsFile(indexPath, fs));
+    String vocabFile = getConf().get("Ivory.FinalVocab");
+    DistributedCache.addCacheFile(new URI(vocabFile), conf);
+    DistributedCache.addCacheFile(new URI(centroidPath), conf);
+    Integer numClusters = getConf().getInt("Ivory.KmeansClusterCount", 5);
+    
+    
+    Path inputPath = new Path(PwsimEnvironment.getTermDocvectorsFile(indexPath, fs));
+    //we really need to choose numClusters docids and get theri vectors sideloaded in
     Path kMeansPath = new Path(outputPath);
 
     if (fs.exists(kMeansPath)) {
       sLogger.info("Output path already exists!");
       return -1;
     }
-    
-//    initialCentroidDocs = new ArrayListWritable<IntWritable>();
-    
-    
-    
-    
-    conf.setJobName(KmeansGetInitialCentroids.class.getSimpleName() + ":" + collectionName);
+    conf.setJobName(KmeansTermDocVectors.class.getSimpleName() + ":" + collectionName);
     conf.setNumMapTasks(mapTasks);
     conf.setNumReduceTasks(0);
     conf.setInt("mapred.min.split.size", minSplitSize);
     conf.set("mapred.child.java.opts", "-Xmx2048m");
+    conf.setBoolean("Ivory.Normalize", getConf().getBoolean("Ivory.Normalize", true));
     FileInputFormat.setInputPaths(conf, inputPath);
     FileOutputFormat.setOutputPath(conf, kMeansPath);
 
     conf.setInputFormat(SequenceFileInputFormat.class);
     conf.setMapOutputKeyClass(IntWritable.class);
-    conf.setMapOutputValueClass(documentClass);
+    conf.setMapOutputValueClass(WeightedIntDocVector.class);
     conf.setOutputFormat(SequenceFileOutputFormat.class);
     conf.setOutputKeyClass(IntWritable.class);
-    conf.setOutputValueClass(documentClass);
+    conf.setOutputValueClass(WeightedIntDocVector.class);
 
     conf.setMapperClass(MyMapper.class);
 
@@ -246,8 +214,8 @@ public class KmeansGetInitialCentroids extends PowerTool {
         + " seconds");
     Counters counters = rj.getCounters();
 
-    env.writeKmeansType(documentType);
+    long numOfDocs= (long) counters.findCounter(Docs.Total).getCounter();
 
-    return (int) getConf().getInt(Constants.KmeansClusterCount, 5);
+    return (int) numOfDocs;
   }
 }

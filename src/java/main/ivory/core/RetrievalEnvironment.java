@@ -30,6 +30,7 @@ import ivory.core.data.index.ProximityPostingsReaderUnorderedWindow;
 import ivory.core.data.stat.DocLengthTable;
 import ivory.core.data.stat.DocLengthTable2B;
 import ivory.core.data.stat.DocScoreTable;
+import ivory.core.data.stat.KmeansDocLengthTable2B;
 import ivory.core.tokenize.Tokenizer;
 import ivory.smrf.model.builder.Expression;
 import ivory.smrf.model.importance.ConceptImportanceModel;
@@ -111,11 +112,19 @@ public class RetrievalEnvironment {
 
 		// Suppress verbose output.
 		Logger.getLogger(DocLengthTable2B.class).setLevel(Level.WARN);
-
+		int number = 0;
 		// get number of documents
+		System.out.println(number);
+		number+=1;
 		numDocs = readCollectionDocumentCount();
+    System.out.println(number);
+    number+=1;
 		collectionSize = readCollectionLength();
+    System.out.println(number);
+    number+=1;
 		postingsType = readPostingsType();
+    System.out.println(number);
+    number+=1;
 		//postingsType = "ivory.data.PostingsListDocSortedPositional";
 
 		LOG.info("PostingsType: " + postingsType);
@@ -129,6 +138,8 @@ public class RetrievalEnvironment {
 		if (fs.exists(new Path(indexPath + "/property.CollectionDocumentCount.local"))) {
 			numDocsLocal = FSProperty.readInt(fs, indexPath + "/property.CollectionDocumentCount.local");
 		}
+    System.out.println(number);
+    number+=1;
 
 		defaultDf = numDocs / 100; // Heuristic!
 		defaultCf = defaultDf * 2; // Heuristic!
@@ -150,35 +161,127 @@ public class RetrievalEnvironment {
 		} catch (Exception e) {
 			throw new ConfigurationException("Error initializing tokenizer!");
 		}
+    System.out.println(number);
+    number+=1;
 
 		LOG.info("Loading postings index...");
 		postingsIndex = new IntPostingsForwardIndex(indexPath, fs);
 		LOG.info(" - Number of terms: " + readCollectionTermCount());
 		LOG.info("Done!");
-
+    System.out.println(number);
+    number+=1;
+    
 		try {
 			termidMap = new DefaultFrequencySortedDictionary(new Path(getIndexTermsData()),
 			    new Path(getIndexTermIdsData()), new Path(getIndexTermIdMappingData()), fs);
 		} catch (Exception e) {
 			throw new ConfigurationException("Error initializing dictionary!");
 		}
+    System.out.println(number);
+    number+=1;
 
 		try {
 			docvectorsIndex = new IntDocVectorsForwardIndex(indexPath, fs);
 		} catch (Exception e) {
 			LOG.warn("Unable to load IntDocVectorsForwardIndex: relevance feedback will not be available.");
 		}
+    System.out.println(number);
+    number+=1;
 
 		// Read the table of doc lengths.
 		if (loadDoclengths) {
 			LOG.info("Loading doclengths table...");
+//			System.out.println("File is: "+fs.open(getDoclengthsData()));
 			doclengths = new DocLengthTable2B(getDoclengthsData(), fs);
 			LOG.info(" - Number of docs: " + doclengths.getDocCount());
 			LOG.info(" - Avg. doc length: " + doclengths.getAvgDocLength());
 			LOG.info("Done!");
 		}
+    System.out.println(number);
+    number+=1;
 	}
 
+	 public void kMeansinitialize(boolean loadDoclengths) throws IOException, ConfigurationException {
+	    LOG.info("Initializing index at " + indexPath);
+
+	    // Suppress verbose output.
+	    Logger.getLogger(KmeansDocLengthTable2B.class).setLevel(Level.WARN);
+	    int number = 0;
+	    // get number of documents
+	    numDocs = readCollectionDocumentCount();
+	    collectionSize = readCollectionLength();
+	    postingsType = readPostingsType();
+	    //postingsType = "ivory.data.PostingsListDocSortedPositional";
+
+	    LOG.info("PostingsType: " + postingsType);
+	    LOG.info("Collection document count: " + numDocs);
+	    LOG.info("Collection length: " + collectionSize);
+
+	    // If property.CollectionDocumentCount.local exists, it means that this
+	    // index is a partition of a large document collection. We want to use
+	    // the global doc count for score, but the Golomb compression is
+	    // determined using the local doc count.
+	    if (fs.exists(new Path(indexPath + "/property.CollectionDocumentCount.local"))) {
+	      numDocsLocal = FSProperty.readInt(fs, indexPath + "/property.CollectionDocumentCount.local");
+	    }
+
+
+	    defaultDf = numDocs / 100; // Heuristic!
+	    defaultCf = defaultDf * 2; // Heuristic!
+
+	    // Initialize the tokenizer; this information is stored along with the
+	    // index since we need to use the same tokenizer to parse queries.
+	    try {
+	      String tokenizerClassName = readTokenizerClass();
+	      if (tokenizerClassName.startsWith("ivory.util.GalagoTokenizer")) {
+	        LOG.warn("Warning: GalagoTokenizer has been refactored to ivory.core.tokenize.GalagoTokenizer!");
+	        tokenizerClassName = "ivory.core.tokenize.GalagoTokenizer";
+	      } else if (tokenizerClassName.startsWith("ivory.tokenize.GalagoTokenizer")) {
+	        LOG.warn("Warning: GalagoTokenizer has been refactored to ivory.core.tokenize.GalagoTokenizer!");
+	        tokenizerClassName = "ivory.core.tokenize.GalagoTokenizer";
+	      }
+
+	      LOG.info("Tokenizer: " + tokenizerClassName);
+	      tokenizer = (Tokenizer) Class.forName(tokenizerClassName).newInstance();
+	    } catch (Exception e) {
+	      throw new ConfigurationException("Error initializing tokenizer!");
+	    }
+
+
+	    LOG.info("Loading postings index...");
+	    postingsIndex = new IntPostingsForwardIndex(indexPath, fs);
+	    LOG.info(" - Number of terms: " + readCollectionTermCount());
+	    LOG.info("Done!");
+
+	    
+	    try {
+	      termidMap = new DefaultFrequencySortedDictionary(new Path(getIndexTermsData()),
+	          new Path(getIndexTermIdsData()), new Path(getIndexTermIdMappingData()), fs);
+	    } catch (Exception e) {
+	      throw new ConfigurationException("Error initializing dictionary!");
+	    }
+
+
+	    try {
+	      docvectorsIndex = new IntDocVectorsForwardIndex(indexPath, fs);
+	    } catch (Exception e) {
+	      LOG.warn("Unable to load IntDocVectorsForwardIndex: relevance feedback will not be available.");
+	    }
+
+
+	    // Read the table of doc lengths.
+	    if (loadDoclengths) {
+	      LOG.info("Loading doclengths table...");
+//	      System.out.println("File is: "+fs.open(getDoclengthsData()));
+	      doclengths = new KmeansDocLengthTable2B(getDoclengthsData(),getDocnoToLengthData(), fs,0);
+	      LOG.info(" - Number of docs: " + doclengths.getDocCount());
+	      LOG.info(" - Avg. doc length: " + doclengths.getAvgDocLength());
+	      LOG.info("Done!");
+	    }
+	    LOG.info("Loaded doc lenghts");
+	  }
+
+	
 	@SuppressWarnings("unchecked")
 	public void loadDocScore(String type, String provider, String path) {
 		LOG.info("Loading doc scores of type: " + type + ", from: " + path + ", provider: " + provider);
@@ -222,7 +325,13 @@ public class RetrievalEnvironment {
 	}
 
 	public int getDocumentLength(int docid) {
+	  try{
 		return doclengths.getDocLength(docid);
+	  }catch(Exception e){
+	    LOG.info("Crap got an error: "+e.getMessage());
+	    LOG.info("Lets check out what hte bad docid was: "+docid);
+	    return -1;
+	  }
 	}
 
 	public long getCollectionSize() {
@@ -230,7 +339,7 @@ public class RetrievalEnvironment {
 	}
 
 	public PostingsReader getPostingsReader(Expression exp) {
-		//LOG.info("**getPostingsReader("+exp+")");;
+//		LOG.info("**getPostingsReader("+exp+")");;
 		PostingsReader postingsReader = null;
 		try {
 			if (exp.getType().equals(Expression.Type.OD)) {
@@ -243,8 +352,11 @@ public class RetrievalEnvironment {
 					if(reader != null)
 						readers.add(reader);
 				}
-
-				postingsReader = new ProximityPostingsReaderOrderedWindow(readers.toArray(new PostingsReader[0]), gapSize);
+				if(readers.isEmpty()){
+				  postingsReader = null;
+				}else{
+				  postingsReader = new ProximityPostingsReaderOrderedWindow(readers.toArray(new PostingsReader[0]), gapSize);
+				}
 			} else if (exp.getType().equals(Expression.Type.UW)) {
 				int windowSize = exp.getWindow();
 				String[] terms = exp.getTerms();
@@ -255,12 +367,16 @@ public class RetrievalEnvironment {
 					if(reader != null)
 						readers.add(reader);
 				}
-
-				postingsReader = new ProximityPostingsReaderUnorderedWindow(readers.toArray(new PostingsReader[0]), windowSize);
+        if(readers.isEmpty()){
+          postingsReader = null;
+        }else{
+          postingsReader = new ProximityPostingsReaderUnorderedWindow(readers.toArray(new PostingsReader[0]), windowSize);
+        }
 			} else {
 				postingsReader = constructPostingsReader(exp.getTerms()[0]);
 			}
 		} catch (Exception e) {
+		  e.printStackTrace();
 			throw new RuntimeException("Unable to initialize PostingsReader!", e);
 		}
 
@@ -309,15 +425,18 @@ public class RetrievalEnvironment {
 		}
 		//LOG.info("termid: "+termid);
 
+//		System.out.println("Term: "+term + " id: "+termid);
 		PostingsList value;
 		try {
 			value = postingsIndex.getPostingsList(termid);
 
 			if (value == null) {
+			  System.out.println("[1] couldn't find PostingsList for term \"" + term + "\"");
 				LOG.error("[1] couldn't find PostingsList for term \"" + term + "\"");
 				return null;
 			}
 		} catch (IOException e) {
+		  System.out.println("[2] couldn't find PostingsList for term \"" + term + "\"");
 			LOG.error("[2] couldn't find PostingsList for term \"" + term + "\"");
 			return null;
 		}
@@ -447,6 +566,10 @@ public class RetrievalEnvironment {
 		return createPath(indexPath, "doclengths.dat");
 	}
 	
+	public Path getDocnoToLengthData(){
+	  return createPath(indexPath, "docnotolengths.dat");
+	}
+	
 	/**
 	 * Returns directory that contains the document length data. Data in this
 	 * directory is compiled into the denoted by {@link #getDoclengthsData()}.
@@ -562,8 +685,21 @@ public class RetrievalEnvironment {
 	  return appendPath(getOverIndex(),"index-trec-"+i);
 	}
 	
+	public String getOldPackDocnoContents(int i){
+	  return appendPath(getCurrentIndex(i),"pack-docno-contents.dat");
+	}
+	
+	 public String getPackDocnoContents(){
+	    return appendPath(indexPath,"pack-docno-contents.dat");
+	  }
+	
+	
+	public String getPackTermDocVectors(int i){
+	  return appendPath(getCurrentIndex(i),"term-doc-vectors");
+	}
+	
 	public String getClusterPackContainerPathEval(int i){
-	  return appendPath(getCurrentIndex(i),"int-doc-vectors");
+	  return appendPath(getCurrentIndex(i),"int-doc-vectors-packed");
 	}
 	
 	public String getclusterPackCollectionPath(int i){
@@ -580,6 +716,12 @@ public class RetrievalEnvironment {
 	
 	public int   readPackDocumentCountEval(int pack) { return FSProperty.readInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocumentCount")); }
   public void writePackDocumentCountEval(int pack, int n) { FSProperty.writeInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocumentCount"), n); }
+  
+  public void writePackDocnoCount(int pack, int n) { FSProperty.writeInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocnoCount"), n); }
+  public int   readOldPackDocnoCount(int pack) { return FSProperty.readInt(fs, appendPath(getCurrentIndex(pack), "property.CollectionDocnoCount")); }
+  public int  readPackDocnoCount(){return FSProperty.readInt(fs, appendPath(indexPath,"property.CollectionDocnoCount"));}
+  public int   readPackDocnoCountPath(Path p, int pack) { return FSProperty.readInt(fs, p.toString()); }
+  
   
 	//end test eval functions
 	
@@ -735,13 +877,25 @@ public class RetrievalEnvironment {
 	public String readKmeansType()      { return FSProperty.readString(fs, appendPath(indexPath, "property.KmeansType")); }
 	public int   readPackDocumentCount(int pack) { return FSProperty.readInt(fs, appendPath(indexPath, "pack_counts/property.CollectionDocumentCount_Pack_"+pack)); }
 	public void writePackDocumentCount(int pack, int n) { FSProperty.writeInt(fs, appendPath(indexPath, "pack_counts/property.CollectionDocumentCount_Pack_"+pack), n); }
+	
+	public void writePackCollectionName(String s,int i)    { FSProperty.writeString(fs, appendPath(getCurrentIndex(i), "property.CollectionName"), s); }
+	public void writePackCollectionPath(String s,int i)    { FSProperty.writeString(fs, appendPath(getCurrentIndex(i), "property.CollectionPath"), s); }
+	public void writePackInputFormat(String s,int i)       { FSProperty.writeString(fs, appendPath(getCurrentIndex(i), "property.InputFormat"), s); }
+	public void writePackDocnoMappingClass(String s,int i) { FSProperty.writeString(fs, appendPath(getCurrentIndex(i), "property.DocnoMappingClass"), s); }
+	public void writePackTokenizerClass(String s, int i)    { FSProperty.writeString(fs, appendPath(getCurrentIndex(i), "property.Tokenizer"), s); }
+	public void writePackDocnoOffset(int n,int i)             { FSProperty.writeInt(fs, appendPath(getCurrentIndex(i), "property.DocnoOffset"), n); }
+	
+	public String readPackCollectionName(int i)    { return FSProperty.readString(fs, appendPath(getCurrentIndex(i), "property.CollectionName"));}
+	public String readPackCollectionPath(int i) {return FSProperty.readString(fs, appendPath(getCurrentIndex(i),"property.CollectionPath"));}
+	
+	
 	public void createPackDocumentCountDir(){
 	  try{
 	  fs.mkdirs(new Path(appendPath(indexPath,"pack_counts")));
 	  }    catch (Exception e) {
-       e.printStackTrace();
-    }
+       e.printStackTrace();}
 	  }
+	
 	public void createPackDocumentDir(int i){
 	  try{
 	    fs.mkdirs(new Path(appendPath(this.getClusterPackDir(),"pack_"+i)));

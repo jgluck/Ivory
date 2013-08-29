@@ -19,6 +19,7 @@ package ivory.core.data.stat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -50,40 +51,44 @@ import edu.umd.cloud9.debug.MemoryUsageUtils;
  * unambiguously to a particular document.
  * </p>
  *
- * @author Jimmy Lin
+ * @author Jon Gluck, Jimmy Lin
  */
-public class DocLengthTable2B implements DocLengthTable {
-  static final Logger LOG = Logger.getLogger(DocLengthTable2B.class);
+public class KmeansDocLengthTable2B implements DocLengthTable {
+  static final Logger LOG = Logger.getLogger(KmeansDocLengthTable2B.class);
 
-  private final short[] lengths;
+//  private final short[] lengths;
+  private final HashMap<Integer,Short> lengthMap;
   private final int docnoOffset;
 
   private int docCount;
   private float avgDocLength;
-
-  /**
-   * Creates a new {@code DocLengthTable2B}.
-   *
-   * @param file document length data file
-   * @throws IOException
-   */
-  public DocLengthTable2B(Path file) throws IOException {
-    this(file, FileSystem.get(new Configuration()));
-  }
+//
+//  /**
+//   * Creates a new {@code DocLengthTable2B}.
+//   *
+//   * @param file document length data file
+//   * @throws IOException
+//   */
+//  public KmeansDocLengthTable2B(Path file) throws IOException {
+//    this(file, FileSystem.get(new Configuration()));
+//  }
   
   
   /**
    * Creates a new {@code DocLengthTable2B}.
    *
    * @param file document length data file
+   * @param Docnomapping
    * @param fs FileSystem to read from
    * @throws IOException
    */
-  public DocLengthTable2B(Path file, FileSystem fs,int sizeOffset) throws IOException {
+  public KmeansDocLengthTable2B(Path file, Path Docnomapping, FileSystem fs,int sizeOffset) throws IOException {
     long docLengthSum = 0;
     docCount = 0;
     System.out.println("File: "+file);
     FSDataInputStream in = fs.open(file);
+    FSDataInputStream mappingIn = fs.open(Docnomapping);
+
 
     // The docno offset.
     docnoOffset = in.readInt();
@@ -91,22 +96,28 @@ public class DocLengthTable2B implements DocLengthTable {
 
     // The size of the document collection.
     int sz = in.readInt() + sizeOffset;
+    
     System.out.println("Size: "+sz);
 
     LOG.info("Docno offset: " + docnoOffset);
     LOG.info("Number of docs: " + (sz - 1));
 
     // Initialize an array to hold all the doc lengths.
-    lengths = new short[sz];
-    LOG.info("Testing one two three");
+    lengthMap = new HashMap<Integer,Short>();
+//    lengths = new short[sz];
     // Read each doc length.
-    for (int i = 1; i < sz; i++) {
-      System.out.println("Currently reading int: "+i);
+    for (int i = 0; i < sz+1; i++) {
+//      System.out.println("Currently reading int: "+i);
       int l = in.readInt();
+      int docno = mappingIn.readInt();
       docLengthSum += l;
-
-      lengths[i] = l > (Short.MAX_VALUE - Short.MIN_VALUE) ? Short.MAX_VALUE
-          : (short) (l + Short.MIN_VALUE);
+      if(l> (Short.MAX_VALUE - Short.MIN_VALUE)){
+        lengthMap.put(docno, Short.MAX_VALUE);
+      }else{
+        lengthMap.put(docno, (short) (l+Short.MIN_VALUE));
+      }
+//      lengths[i] = l > (Short.MAX_VALUE - Short.MIN_VALUE) ? Short.MAX_VALUE
+//          : (short) (l + Short.MIN_VALUE);
       docCount++;
 
       if (i % 1000000 == 0) {
@@ -122,61 +133,16 @@ public class DocLengthTable2B implements DocLengthTable {
     avgDocLength = docLengthSum * 1.0f / docCount;
   }
 
-  /**
-   * Creates a new {@code DocLengthTable2B}.
-   *
-   * @param file document length data file
-   * @param fs FileSystem to read from
-   * @throws IOException
-   */
-  public DocLengthTable2B(Path file, FileSystem fs) throws IOException {
-    long docLengthSum = 0;
-    docCount = 0;
-    System.out.println("File: "+file);
-    FSDataInputStream in = fs.open(file);
-
-    // The docno offset.
-    docnoOffset = in.readInt();
-    System.out.println("docnooffset: "+docnoOffset);
-
-    // The size of the document collection.
-    int sz = in.readInt() + 1;
-    System.out.println("Size: "+sz);
-
-    LOG.info("Docno offset: " + docnoOffset);
-    LOG.info("Number of docs: " + (sz - 1));
-
-    // Initialize an array to hold all the doc lengths.
-    lengths = new short[sz];
-    LOG.info("Testing one two three");
-    // Read each doc length.
-    for (int i = 1; i < sz; i++) {
-      System.out.println("Currently reading int: "+i);
-      int l = in.readInt();
-      docLengthSum += l;
-
-      lengths[i] = l > (Short.MAX_VALUE - Short.MIN_VALUE) ? Short.MAX_VALUE
-          : (short) (l + Short.MIN_VALUE);
-      docCount++;
-
-      if (i % 1000000 == 0) {
-        LOG.info(i + " doclengths read");
-      }
-    }
-
-    in.close();
-
-    LOG.info("Total of " + docCount + " doclengths read");
-
-    // Compute average doc length.
-    avgDocLength = docLengthSum * 1.0f / docCount;
-  }
+  
 
   @Override
   public int getDocLength(int docno) {
-    return lengths[docno - docnoOffset] - Short.MIN_VALUE;
+//    }
+//    System.out.println("JON: lengthmap is - "+this.lengthMap);
+    return this.lengthMap.get(docno);
+//    return lengths[docno - docnoOffset] - Short.MIN_VALUE;
   }
-
+  
   @Override
   public int getDocnoOffset() {
     return docnoOffset;
@@ -199,22 +165,22 @@ public class DocLengthTable2B implements DocLengthTable {
       System.exit(-1);
     }
 
-    long startingMemoryUse = MemoryUsageUtils.getUsedMemory();
-
-    DocLengthTable2B lengths = new DocLengthTable2B(new Path(args[0]),
-        FileSystem.get(new Configuration()));
-    long endingMemoryUse = MemoryUsageUtils.getUsedMemory();
-
-    System.out.println("Memory usage: " + (endingMemoryUse - startingMemoryUse) + " bytes\n");
-    System.out.println("Average doc length: " + lengths.getAvgDocLength());
-    System.out.println("Docno offset: " + lengths.getDocnoOffset());
-
-    String docno = null;
-    BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-    System.out.print("Look up doclength for docno> ");
-    while ((docno = stdin.readLine()) != null) {
-      System.out.println(lengths.getDocLength(Integer.parseInt(docno)));
-      System.out.print("Look up doclength for docno> ");
-    }
+//    long startingMemoryUse = MemoryUsageUtils.getUsedMemory();
+//
+//    KmeansDocLengthTable2B lengths = new KmeansDocLengthTable2B(new Path(args[0]),
+//        FileSystem.get(new Configuration()));
+//    long endingMemoryUse = MemoryUsageUtils.getUsedMemory();
+//
+//    System.out.println("Memory usage: " + (endingMemoryUse - startingMemoryUse) + " bytes\n");
+//    System.out.println("Average doc length: " + lengths.getAvgDocLength());
+//    System.out.println("Docno offset: " + lengths.getDocnoOffset());
+//
+//    String docno = null;
+//    BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+//    System.out.print("Look up doclength for docno> ");
+//    while ((docno = stdin.readLine()) != null) {
+//      System.out.println(lengths.getDocLength(Integer.parseInt(docno)));
+//      System.out.print("Look up doclength for docno> ");
+//    }
   }
 }

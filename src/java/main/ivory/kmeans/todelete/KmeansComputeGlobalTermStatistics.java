@@ -14,7 +14,7 @@
  * permissions and limitations under the License.
  */
 
-package ivory.core.preprocess;
+package ivory.kmeans.todelete;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
@@ -126,7 +126,7 @@ public class KmeansComputeGlobalTermStatistics extends PowerTool {
 
   public KmeansComputeGlobalTermStatistics(Configuration conf) {
     super(conf);
-    Log.info("Uh oh. You used the wrong constructor");
+//    Log.info("Uh oh. You used the wrong constructor");
   }
   
   public KmeansComputeGlobalTermStatistics(Configuration conf, Integer pack) {
@@ -160,6 +160,7 @@ public class KmeansComputeGlobalTermStatistics extends PowerTool {
 
     LOG.info("PowerTool: " + KmeansComputeGlobalTermStatistics.class.getSimpleName());
     LOG.info(String.format(" - %s: %s", Constants.CollectionName, collectionName));
+    LOG.info(String.format(" - %s: %d", "Ivory.CurrentPackNo", conf.getInt("Ivory.CurrentPackNo",0)));
     LOG.info(String.format(" - %s: %s", Constants.IndexPath, indexPath));
     LOG.info(String.format(" - %s: %s", Constants.NumReduceTasks, reduceTasks));
 

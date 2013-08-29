@@ -22,6 +22,8 @@ import ivory.smrf.model.potential.PotentialFunction;
 import java.util.Comparator;
 import java.util.List;
 
+import org.mortbay.log.Log;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -76,6 +78,7 @@ public class Clique {
    */
   public void initialize(GlobalEvidence globalEvidence) throws ConfigurationException {
     Preconditions.checkNotNull(globalEvidence);
+//    Log.info("JON: potential: + " + potential.getClass());
     this.potential.initialize(nodes, globalEvidence);
   }
 

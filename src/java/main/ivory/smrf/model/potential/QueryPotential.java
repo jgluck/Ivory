@@ -33,6 +33,7 @@ import ivory.smrf.model.score.ScoringFunction;
 
 import java.util.List;
 
+import org.mortbay.log.Log;
 import org.w3c.dom.Node;
 
 import com.google.common.base.Preconditions;
@@ -143,6 +144,7 @@ public class QueryPotential extends PotentialFunction {
   public float computePotential() {
     // If there are no postings associated with this potential then just
     // return the default score.
+//    Log.info("Jon; Output Docno - "+docNode.getDocno());
     if (postingsReader == null) {
       return DEFAULT_SCORE;
     }
@@ -157,11 +159,26 @@ public class QueryPotential extends PotentialFunction {
 
     // Compute term frequency.
     int tf = 0;
+    
     if (docNode.getDocno() == postingsReader.getDocno()) {
       tf = postingsReader.getTf();
     }
 
-    int docLen = env.getDocumentLength(docNode.getDocno());
+//    Log.info("JON: Term Frequency - "+tf);
+    
+//    if(tf==0){
+//      System.out.println("JON: Returning default score due to null.");
+//      return DEFAULT_SCORE;
+//    }
+    
+    Integer docLen = env.getDocumentLength(docNode.getDocno());
+    
+    //document not found in current pack
+    if(docLen == -1){
+      lastScoredDocno = docNode.getDocno();
+      return DEFAULT_SCORE;
+    }
+    
     float score = scoringFunction.getScore(tf, docLen);
     lastScoredDocno = docNode.getDocno();
 

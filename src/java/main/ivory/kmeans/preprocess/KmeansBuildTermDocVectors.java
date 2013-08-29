@@ -14,7 +14,7 @@
  * permissions and limitations under the License.
  */
 
-package ivory.core.preprocess;
+package ivory.kmeans.preprocess;
 
 import ivory.core.Constants;
 import ivory.core.RetrievalEnvironment;
@@ -22,9 +22,15 @@ import ivory.core.data.document.LazyTermDocVector;
 import ivory.core.data.document.TermDocVector;
 import ivory.core.tokenize.DocumentProcessingUtils;
 import ivory.core.tokenize.Tokenizer;
+import ivory.kmeans.util.KmeansUtility;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -56,13 +62,26 @@ import edu.umd.cloud9.util.array.ArrayListOfInts;
 import edu.umd.cloud9.util.map.HMapII;
 import edu.umd.cloud9.util.map.MapII;
 
-public class BuildTermDocVectors extends PowerTool {
-  private static final Logger LOG = Logger.getLogger(BuildTermDocVectors.class);
+
+/**
+ * Like normal BuildTermDocVectors, but takes a list of documents found in a pack and filters all others out.
+ * Because document numbers are no longer sequential or contiguous, Uses alternative docnolength.dat tricks.
+ * @author jgluck
+ *
+ */
+public class KmeansBuildTermDocVectors extends PowerTool {
+  private static final Logger LOG = Logger.getLogger(KmeansBuildTermDocVectors.class);
 
   protected static enum Docs { Skipped, Total, Empty }
   protected static enum MapTime { Spilling, Parsing }
   protected static enum DocLengths { Count, SumOfDocLengths, Files }
 
+  
+  /**
+   * Takes a list of document numbers from distributed cache and filters for only those documents.
+   * @author jgluck
+   *
+   */
   protected static class MyMapper extends Mapper<Writable, Indexable, IntWritable, TermDocVector> {
     private static final IntWritable key = new IntWritable();
     private static final LazyTermDocVector docVector = new LazyTermDocVector();
@@ -71,25 +90,32 @@ public class BuildTermDocVectors extends PowerTool {
     private Tokenizer tokenizer;
     private DocnoMapping docMapping;
     private int docno;
+    
+    ArrayList<Integer> packDocnos = new ArrayList<Integer>();
 
     @Override
     public void setup(Mapper<Writable, Indexable, IntWritable, TermDocVector>.Context context)
         throws IOException {
       Configuration conf = context.getConfiguration();
+      KmeansUtility kmeansHelper = new KmeansUtility(conf);
 
       try {
         FileSystem localFs = FileSystem.getLocal(conf);
         docMapping =
           (DocnoMapping) Class.forName(conf.get(Constants.DocnoMappingClass)).newInstance();
+        //READ IN FILE WITH DOCUMENTS THAT GO IN THIS PARTITION
         // Take a different code path if we're in standalone mode.
         if (conf.get("mapred.job.tracker").equals("local")) {
           RetrievalEnvironment env = new RetrievalEnvironment(
               context.getConfiguration().get(Constants.IndexPath), localFs);
           docMapping.loadMapping(env.getDocnoMappingData(), localFs);
+          kmeansHelper.readPackContents(packDocnos,conf.getInt("Ivory.CurrentPackNo", 0));
         } else {
           Path[] localFiles = DistributedCache.getLocalCacheFiles(conf);
           // Load the docid to docno mappings. Assume file 0.
           docMapping.loadMapping(localFiles[0], localFs);
+          kmeansHelper.readPackContentsWithPath(packDocnos, conf.getInt("Ivory.CurrentPackNo", 0),localFiles[1], localFs);
+          
         }
       } catch (Exception e) {
         throw new RuntimeException("Error initializing docno mapping!", e);
@@ -112,6 +138,10 @@ public class BuildTermDocVectors extends PowerTool {
       
       // Skip invalid docnos.
       if (docno <= 0) {
+        context.getCounter(Docs.Skipped).increment(1);
+        return;
+      }else if(!this.packDocnos.contains(docno)){
+      //lookup if it belongs in this partition
         context.getCounter(Docs.Skipped).increment(1);
         return;
       }
@@ -142,6 +172,7 @@ public class BuildTermDocVectors extends PowerTool {
       doclengths.put(docno, doclength);
     }
 
+
     @Override
     public void cleanup(Mapper<Writable, Indexable, IntWritable, TermDocVector>.Context context)
           throws IOException, InterruptedException {
@@ -151,9 +182,11 @@ public class BuildTermDocVectors extends PowerTool {
       // the may be multiple files with the same doclength information,
       // which we have the handle when we go to write out the binary
       // encoding of the data.
+      
+
 
       if (doclengths.size() == 0) {
-        throw new RuntimeException("Error: Doclength table empty!");
+        throw new RuntimeException("Error: Doclength table empty!: "+this.packDocnos);
       }
 
       long bytesCnt = 0;
@@ -199,6 +232,11 @@ public class BuildTermDocVectors extends PowerTool {
     }
   }
 
+  /**
+   * Modified to allow non-contiguous document numbers
+   * @author jgluck
+   *
+   */
   private static class DocLengthDataWriterMapper extends NullMapper {
     @Override
     public void runSafely(
@@ -208,6 +246,7 @@ public class BuildTermDocVectors extends PowerTool {
         int collectionDocCount = conf.getInt(Constants.CollectionDocumentCount, -1);
         String inputPath = conf.get(InputPath);
         String dataFile = conf.get(DocLengthDataFile);
+        String docnoToLengthsFile = conf.get(DocnoToLengthFile);
 
         int docnoOffset = conf.getInt(Constants.DocnoOffset, 0);
 
@@ -226,6 +265,7 @@ public class BuildTermDocVectors extends PowerTool {
         int minDocno = Integer.MAX_VALUE; // Smallest docno.
 
         int nFiles = fileStats.length;
+        HashMap<Integer,Integer> docnotoLength = new HashMap<Integer,Integer>();
         for (int i = 0; i < nFiles; i++) {
           // Skip log files
           if (fileStats[i].getPath().getName().startsWith("_")) {
@@ -249,20 +289,9 @@ public class BuildTermDocVectors extends PowerTool {
               throw new RuntimeException("Error: docno " + docno + " < docnoOffset " + docnoOffset
                   + "!");
             }
-
-            if (docno - docnoOffset >= doclengths.length) {
-              throw new RuntimeException("Error: docno - docnoOffset " + (docno - docnoOffset) 
-                  + " >= collectionDocCount " + collectionDocCount + "!");
-            }
             
-            doclengths[docno - docnoOffset] = len;
+            docnotoLength.put(docno, len);
 
-            if (docno > maxDocno) {
-              maxDocno = docno;
-            }
-            if (docno < minDocno) {
-              minDocno = docno;
-            }
           }
           reader.close();
           context.getCounter(DocLengths.Files).increment(1);
@@ -273,22 +302,33 @@ public class BuildTermDocVectors extends PowerTool {
 
         // Write out the doc length data into a single file.
         FSDataOutputStream out = fs.create(new Path(dataFile), true);
-
+        FSDataOutputStream out2 = fs.create(new Path(docnoToLengthsFile),true);
+        
+        
         out.writeInt(docnoOffset); // Write out the docno offset.
-        out.writeInt(maxDocno - docnoOffset); // Write out the collection size.
+        out.writeInt(docnotoLength.keySet().size()-1);//write out the collection size
 
-        // Write out length of each document (docnos are sequentially
-        // ordered, so no need to explicitly keep track).
+        // Write out length of each document 
         int n = 0;
-        for (int i = 1; i <= maxDocno - docnoOffset; i++) {
-          out.writeInt(doclengths[i]);
+
+        Set<Integer> keyset = docnotoLength.keySet();
+        
+        ArrayList<Integer> keys = new ArrayList<Integer>();
+        for(Integer i: keyset){
+          keys.add(i);
+        }
+        Collections.sort(keys); //sorted keys
+        for(int i=0; i<keyset.size();i++){
+          out.writeInt(docnotoLength.get(keys.get(i)));
+          out2.writeInt(keys.get(i));//docno
           n++;
           context.getCounter(DocLengths.Count).increment(1);
-          context.getCounter(DocLengths.SumOfDocLengths).increment(doclengths[i]);
+          context.getCounter(DocLengths.SumOfDocLengths).increment(docnotoLength.get(keys.get(i)));
         }
         LOG.info(n + " doc lengths written");
 
         out.close();
+        out2.close();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -297,6 +337,7 @@ public class BuildTermDocVectors extends PowerTool {
 
   private static final String InputPath = "Ivory.InputPath";
   private static final String DocLengthDataFile = "Ivory.DocLengthDataFile";
+  private static final String DocnoToLengthFile = "Ivory.DocnoToLengthFile";
 
   public static final String[] RequiredParameters = {
           Constants.CollectionName,
@@ -312,7 +353,8 @@ public class BuildTermDocVectors extends PowerTool {
     return RequiredParameters;
   }
 
-  public BuildTermDocVectors(Configuration conf) {
+  
+  public KmeansBuildTermDocVectors(Configuration conf) {
     super(conf);
   }
 
@@ -330,7 +372,7 @@ public class BuildTermDocVectors extends PowerTool {
     int docnoOffset = conf.getInt(Constants.DocnoOffset, 0);
     int numReducers = conf.getInt(Constants.TermDocVectorSegments, 0);
 
-    LOG.info("PowerTool: " + BuildTermDocVectors.class.getSimpleName());
+    LOG.info("PowerTool: " + KmeansBuildTermDocVectors.class.getSimpleName());
     LOG.info(String.format(" - %s: %s", Constants.IndexPath, indexPath));
     LOG.info(String.format(" - %s: %s", Constants.CollectionName, collectionName));
     LOG.info(String.format(" - %s: %s", Constants.CollectionPath, collectionPath));
@@ -341,15 +383,22 @@ public class BuildTermDocVectors extends PowerTool {
     LOG.info(String.format(" - %s: %s", Constants.TermDocVectorSegments, numReducers));
     LOG.info(String.format(" - %s: %s", Constants.CollectionVocab, conf.get(Constants.CollectionVocab)));
     LOG.info(String.format(" - %s: %s", Constants.StopwordList, conf.get(Constants.StopwordList)));
+    LOG.info(String.format(" - %s: %s", "Ivory.CurrentPackNo", conf.getInt("Ivory.CurrentPackNo", 0)));
 
     RetrievalEnvironment env = new RetrievalEnvironment(indexPath, fs);
     Path mappingFile = env.getDocnoMappingData();
-
+    Path packContents = new Path(env.getPackDocnoContents());
+    int packDocCount = env.readPackDocnoCount();
+    LOG.info("Pack document count: "+packDocCount);
+    conf.setInt("Ivory.PackDocCount", packDocCount);
+    
     if (!fs.exists(mappingFile)) {
       throw new RuntimeException("Error, docno mapping data file " + mappingFile + " doesn't exist!");
     }
 
     DistributedCache.addCacheFile(mappingFile.toUri(), conf);
+    DistributedCache.addCacheFile(packContents.toUri(),conf);
+    //ADD NEXT THING TO DCACHE
 
     Path outputPath = new Path(env.getTermDocVectorsDirectory());
     if (fs.exists(outputPath)) {
@@ -363,14 +412,21 @@ public class BuildTermDocVectors extends PowerTool {
     env.writeDocnoMappingClass(mappingClass);
     env.writeTokenizerClass(tokenizer);
     env.writeDocnoOffset(docnoOffset);
+    
+//    env.writePackCollectionName(collectionName,conf.getInt("Ivory.CurrentPackNo", 0));
+//    env.writePackCollectionPath(collectionPath,conf.getInt("Ivory.CurrentPackNo", 0));
+//    env.writePackInputFormat(inputFormat,conf.getInt("Ivory.CurrentPackNo", 0));
+//    env.writePackDocnoMappingClass(mappingClass,conf.getInt("Ivory.CurrentPackNo", 0));
+//    env.writePackTokenizerClass(tokenizer,conf.getInt("Ivory.CurrentPackNo", 0));
+//    env.writePackDocnoOffset(docnoOffset,conf.getInt("Ivory.CurrentPackNo", 0));
 
     conf.set("mapreduce.task.timeout", "6000000");			// needed for stragglers (e.g., very long documents in Wikipedia)
     conf.set("mapreduce.map.memory.mb", "2048");
     conf.set("mapreduce.map.java.opts", "-Xmx2048m");
 
     Job job1 = Job.getInstance(conf,
-        BuildTermDocVectors.class.getSimpleName() + ":" + collectionName);
-    job1.setJarByClass(BuildTermDocVectors.class);
+        KmeansBuildTermDocVectors.class.getSimpleName() + ":" + collectionName);
+    job1.setJarByClass(KmeansBuildTermDocVectors.class);
 
     job1.setNumReduceTasks(numReducers);
 
@@ -401,10 +457,17 @@ public class BuildTermDocVectors extends PowerTool {
       LOG.info("DocLength data exists: Skipping!");
       return 0;
     }
+    
+    Path dlmFile = env.getDocnoToLengthData();
+    if (fs.exists(dlmFile)) {
+      LOG.info("DocnotoLength data exists: Skipping!");
+      return 0;
+    }
 
     conf.setInt(Constants.CollectionDocumentCount, collectionDocCount);
     conf.set(InputPath, env.getDoclengthsDirectory().toString());
     conf.set(DocLengthDataFile, dlFile.toString());
+    conf.set(DocnoToLengthFile,dlmFile.toString());
 
     //conf.set("mapred.child.java.opts", "-Xmx2048m");
     conf.set("mapreduce.map.memory.mb", "2048");
@@ -418,7 +481,7 @@ public class BuildTermDocVectors extends PowerTool {
     LOG.info("Writing doc length data to " + dlFile + "...");
 
     Job job2 = Job.getInstance(conf, "DocLengthTable:" + collectionName);
-    job2.setJarByClass(BuildTermDocVectors.class);
+    job2.setJarByClass(KmeansBuildTermDocVectors.class);
 
     job2.setNumReduceTasks(0);
     job2.setInputFormatClass(NullInputFormat.class);

@@ -14,7 +14,7 @@
  * permissions and limitations under the License.
  */
 
-package ivory.smrf.retrieval;
+package ivory.kmeans.util;
 
 import ivory.core.ConfigurationException;
 import ivory.core.RetrievalEnvironment;
@@ -23,8 +23,12 @@ import ivory.core.util.XMLTools;
 import ivory.smrf.model.builder.MRFBuilder;
 import ivory.smrf.model.expander.MRFExpander;
 import ivory.smrf.model.importance.ConceptImportanceModel;
+import ivory.smrf.retrieval.Accumulator;
+import ivory.smrf.retrieval.QueryRunner;
+import ivory.smrf.retrieval.ThreadedQueryRunner;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
@@ -45,8 +49,14 @@ import com.google.common.collect.Sets;
 
 import edu.umd.cloud9.collection.DocnoMapping;
 
-public class BatchQueryRunner {
-  private static final Logger LOG = Logger.getLogger(BatchQueryRunner.class);
+/**
+ * Just like BatchQueryRunner but stops evaluation right before printing
+ * check out the runQueriesIntermediate method
+ * @author jgluck
+ *
+ */
+public class KmeansBatchQueryRunner {
+  private static final Logger LOG = Logger.getLogger(KmeansBatchQueryRunner.class);
 
   protected DocnoMapping docnoMapping = null;
   protected FileSystem fs = null;
@@ -62,11 +72,11 @@ public class BatchQueryRunner {
   protected final Map<String, QueryRunner> queryRunners = Maps.newLinkedHashMap();
   protected final Set<String> stopwords = Sets.newHashSet();
 
-  public BatchQueryRunner(String[] args, FileSystem fs) throws ConfigurationException {
+  public KmeansBatchQueryRunner(String[] args, FileSystem fs) throws ConfigurationException {
     init(args, fs);
   }
 
-  public BatchQueryRunner(String[] args, FileSystem fs, String indexPath)
+  public KmeansBatchQueryRunner(String[] args, FileSystem fs, String indexPath)
       throws ConfigurationException {
     this.indexPath = indexPath;
     init(args, fs);
@@ -108,7 +118,7 @@ public class BatchQueryRunner {
   protected void loadRetrievalEnv() throws ConfigurationException {
     try {
       env = new RetrievalEnvironment(indexPath, fs);
-      env.initialize(true);
+      env.kMeansinitialize(true);
     } catch (IOException e) {
       e.printStackTrace();
       throw new ConfigurationException("Failed to instantiate RetrievalEnvironment: "
@@ -117,20 +127,25 @@ public class BatchQueryRunner {
 
   }
 
-  public void runQueries() {
+  /**
+   * Runs queries and inserts them into aggregator
+   * @param agg
+   */
+  public void runQueriesIntermediate(KmeansAggregator agg){
+    QueryRunner runner = null;
     for (String modelID : models.keySet()) {
       Node modelNode = models.get(modelID);
       Node expanderNode = expanders.get(modelID);
 
       // Initialize retrieval environment variables.
-      QueryRunner runner = null;
+      runner = null;
       MRFBuilder builder = null;
       MRFExpander expander = null;
       try {
-        // Get the MRF builder.
+
         builder = MRFBuilder.get(env, modelNode.cloneNode(true));
 
-        // Get the MRF expander.
+ 
         expander = null;
         if (expanderNode != null) {
           expander = MRFExpander.getExpander(env, expanderNode.cloneNode(true));
@@ -155,7 +170,77 @@ public class BatchQueryRunner {
       for (String queryID : queries.keySet()) {
         String rawQueryText = queries.get(queryID);
         String[] queryTokens = env.tokenize(rawQueryText);
+//        System.out.println(String.format("query id: %s, query: \"%s\"", queryID, rawQueryText));
+        LOG.info(String.format("query id: %s, query: \"%s\"", queryID, rawQueryText));
 
+        // Execute the query.
+        runner.runQuery(queryID, queryTokens);
+      }
+
+      // Where should we output these results?
+      Node model = models.get(modelID);
+      String fileName = XMLTools.getAttributeValue(model, "output", null);
+      boolean compress = XMLTools.getAttributeValue(model, "compress", false);
+      agg.addOutputOptions(modelID, fileName, compress);
+      
+//
+//      try {
+//        ResultWriter resultWriter = new ResultWriter(fileName, compress, fs);
+//        printResults(modelID, runner, resultWriter);
+//        resultWriter.flush();
+//      } catch (IOException e) {
+//        throw new RuntimeException("Error: Unable to write results!");
+//      }
+      agg.addResults(modelID, runner.getResults());
+    }
+    agg.addQueries(this.queries);
+    if(this.docnoMapping!=null){
+      agg.addDocnoMapping(this.docnoMapping); 
+    }
+  }
+  
+  
+  public void runQueries() {
+    for (String modelID : models.keySet()) {
+      Node modelNode = models.get(modelID);
+      Node expanderNode = expanders.get(modelID);
+
+      // Initialize retrieval environment variables.
+      QueryRunner runner = null;
+      MRFBuilder builder = null;
+      MRFExpander expander = null;
+      try {
+        // Get the MRF builder.
+//        LOG.info("JON: Getting MRF Builder");
+        builder = MRFBuilder.get(env, modelNode.cloneNode(true));
+
+        // Get the MRF expander.
+//        LOG.info("JON: Getting MRF Expander");
+        expander = null;
+        if (expanderNode != null) {
+          expander = MRFExpander.getExpander(env, expanderNode.cloneNode(true));
+        }
+        if (stopwords != null && stopwords.size() != 0) {
+          expander.setStopwordList(stopwords);
+        }
+
+        int numHits = XMLTools.getAttributeValue(modelNode, "hits", 1000);
+
+        LOG.info("number of hits: " + numHits);
+
+        // Multi-threaded query evaluation still a bit unstable; setting
+        // thread=1 for now.
+        runner = new ThreadedQueryRunner(builder, expander, 1, numHits);
+
+        queryRunners.put(modelID, runner);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+
+      for (String queryID : queries.keySet()) {
+        String rawQueryText = queries.get(queryID);
+        String[] queryTokens = env.tokenize(rawQueryText);
+//        System.out.println(String.format("query id: %s, query: \"%s\"", queryID, rawQueryText));
         LOG.info(String.format("query id: %s, query: \"%s\"", queryID, rawQueryText));
 
         // Execute the query.
@@ -213,11 +298,13 @@ public class BatchQueryRunner {
     return docnoMapping;
   }
 
+  
   private void printResults(String modelID, QueryRunner runner, ResultWriter resultWriter)
       throws IOException {
 
     for (String queryID : queries.keySet()) {
       // Get the ranked list for this query.
+//      LOG.info("JON: MODELID: "+modelID+ " and resultslist: "+ runner.getResults(queryID));
       Accumulator[] list = runner.getResults(queryID);
       if (list == null) {
         LOG.info("null results for: " + queryID);
@@ -227,13 +314,17 @@ public class BatchQueryRunner {
       if (docnoMapping == null) {
         // Print results with internal docnos if unable to translate to
         // external docids.
+//        LOG.info("JON: Entering iteration step null");
         for (int i = 0; i < list.length; i++) {
+//          LOG.info("JON: Printing out accumulated result: "+i);
           resultWriter.println(queryID + " Q0 " + list[i].docno + " " + (i + 1) + " "
               + list[i].score + " " + modelID);
         }
       } else {
         // Translate internal docnos to external docids.
+//        LOG.info("JON: Entering iteration step exists");
         for (int i = 0; i < list.length; i++) {
+//          LOG.info("JON: Printing out accumulated result: "+i);
           resultWriter.println(queryID + " Q0 " + docnoMapping.getDocid(list[i].docno)
               + " " + (i + 1) + " " + list[i].score + " " + modelID);
         }

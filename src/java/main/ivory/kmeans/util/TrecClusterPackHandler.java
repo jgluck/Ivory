@@ -1,4 +1,4 @@
-package ivory.core.preprocess;
+package ivory.kmeans.util;
 
 
 import java.io.IOException;

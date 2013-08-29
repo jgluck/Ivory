@@ -28,6 +28,9 @@ public abstract class ProximityPostingsReader implements PostingsReader {
   public ProximityPostingsReader(PostingsReader[] readers, int size) {
     Preconditions.checkArgument(size > 0);
     this.readers = Preconditions.checkNotNull(readers);
+    if(this.readers[0]==null){
+      System.out.println("Poof");
+    }
     this.size = size;
   }
 

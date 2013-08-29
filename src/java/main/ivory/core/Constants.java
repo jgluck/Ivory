@@ -38,6 +38,8 @@ public class Constants {
   public static final String KmeansClusterCount = "Ivory.KmeansClusterCount";
   public static final String KmeansDocumentType = "Ivory.KmeansDocumentType";
   public static final String KmeansPackCount = "Ivory.KmeansPackCount";
+  public static final String CurrentPackNo = "Ivory.CurrentPackNo";
+  public static final String KmeansClusterSteps = "Ivory.KmeansClusterSteps";
 
   /**
    * Memory threshold for the LP indexing algorithm: spill in the map phase after memory fills up to
